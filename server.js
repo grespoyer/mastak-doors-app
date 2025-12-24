@@ -11,8 +11,7 @@ const util = require('util');
 const execPromise = util.promisify(exec);
 const crypto = require('crypto');
 const app = express();
-// 🔑 ГЛАВНОЕ ИЗМЕНЕНИЕ: Порт теперь берётся из настроек Render
-const PORT = process.env.PORT || 3000; // Render сам задаст этот порт
+const PORT = process.env.PORT;
 // Настройки (без изменений)
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const ADMIN_DIR = path.join(__dirname, 'admin');
@@ -969,7 +968,7 @@ app.delete('/api/orders/:id', async (req, res) => {
 });
 // === Админка ===
 app.get('/admin/login', (req, res) => {
-    const ADMIN_TOKEN = 'door_admin_secret_123';
+    const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
     res.send(`
         <!DOCTYPE html>
         <html>
@@ -1017,7 +1016,7 @@ app.get('/admin/login', (req, res) => {
     `);
 });
 app.get('/admin/auth', (req, res) => {
-    const ADMIN_TOKEN = 'door_admin_secret_123';
+    const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
     const { token } = req.query;
     if (token === ADMIN_TOKEN) {
         return res.send(`
