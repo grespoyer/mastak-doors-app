@@ -1,0 +1,259 @@
+/* Стили личного кабинета партнера */
+#partner-cabinet-modal .modal-content {
+    max-width: 900px;
+    width: 95%;
+    padding: 25px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.cabinet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.cabinet-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #ddd;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    padding-top: 10px;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    color: #6c757d;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: #4361ee;
+}
+
+.tab-btn.active {
+    color: #4361ee;
+    border-bottom: 3px solid #4361ee;
+}
+
+.tab-content {
+    display: none;
+    min-height: 400px; /* Минимальная высота для предотвращения скакания */
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.loading-orders {
+    text-align: center;
+    padding: 20px;
+    color: #6c757d;
+}
+
+.orders-toolbar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.orders-toolbar-left {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.orders-filter {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: white;
+}
+
+.orders-search {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    width: 200px;
+    min-width: 150px;
+}
+
+.order-item {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    overflow: hidden;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.order-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px;
+    background: #f8f9fa;
+    cursor: pointer;
+    align-items: center;
+}
+
+.order-id {
+    font-weight: bold;
+    color: #4361ee;
+    flex: 1;
+}
+
+.order-date {
+    color: #6c757d;
+    font-size: 0.9rem;
+    flex: 1;
+    text-align: center;
+}
+
+.order-total {
+    font-weight: bold;
+    color: #28a745;
+    flex: 1;
+    text-align: center;
+}
+
+.order-status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    margin-left: 10px;
+    flex: 1;
+    text-align: center;
+}
+
+.order-status.new {
+    background: #ffc107;
+    color: #212529;
+}
+
+.order-status.processing {
+    background: #17a2b8;
+    color: white;
+}
+
+.order-status.completed {
+    background: #28a745;
+    color: white;
+}
+
+.order-status.cancelled {
+    background: #dc3545;
+    color: white;
+}
+
+.order-items {
+    padding: 0 15px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease;
+    background: #f8f9fa;
+}
+
+.order-items.expanded {
+    padding: 15px;
+    max-height: 500px;
+}
+
+.order-item-name {
+    display: block;
+    margin: 8px 0;
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.order-comments {
+    margin-top: 10px;
+    padding: 10px;
+    background: #e9ecef;
+    border-radius: 4px;
+    font-style: italic;
+    display: none;
+}
+
+.order-comments.expanded {
+    display: block;
+}
+
+.no-orders {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+    font-style: italic;
+    font-size: 1.1rem;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #495057;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 16px;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    border-color: #4361ee;
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+}
+
+.profile-save-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 15px;
+    display: none;
+}
+/* Добавленные стили для уведомлений в кабинете партнера */
+.order-notice {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 10px;
+    margin: 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+.stock-notice {
+    color: #ff9800;
+    font-weight: bold;
+    margin-left: 5px;
+}
+.order-status.processing {
+    background: linear-gradient(135deg, #17a2b8 0%, #0d7894 100%);
+}

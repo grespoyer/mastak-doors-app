@@ -1,0 +1,148 @@
+.orders-card {
+    width: 100%;
+}
+
+.table-container {
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    position: relative;
+}
+
+.order-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.order-table th, 
+.order-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    vertical-align: middle;
+}
+
+.order-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.order-table tr:hover {
+    background-color: #f5f7ff;
+}
+
+.order-email {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+/* Таблица товаров в заказе */
+.order-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+}
+
+.order-items-table th,
+.order-items-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.order-items-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.order-total {
+    margin-top: 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #28a745;
+}
+
+/* Модальное окно деталей заказа */
+#orderDetailsModal .modal-content {
+    width: 800px;
+    max-width: 95%;
+}
+
+.customer-info p {
+    margin: 8px 0;
+}
+
+.order-id, .order-date, .order-customer, .order-contacts, .order-status, .order-total, .order-actions {
+    text-align: left;
+    padding-left: 10px;
+}
+
+/* Индикаторы статусов */
+.status-indicators {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    border-radius: 50%;
+    background-color: #e9ecef; /* серый фон для неактивных */
+    color: #495057; /* темный текст для неактивных */
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.status-indicator:hover {
+    transform: scale(1.1);
+}
+
+/* Цвета для активных статусов */
+.status-indicator[data-status="new"].active {
+    background-color: #0d6efd; /* синий */
+    color: white;
+}
+
+.status-indicator[data-status="processing"].active {
+    background-color: #ff9933; /* оранжевый */
+    color: white;
+}
+
+.status-indicator[data-status="completed"].active {
+    background-color: #28a745; /* зеленый */
+    color: white;
+}
+
+.status-indicator[data-status="cancelled"].active {
+    background-color: #dc3545; /* красный */
+    color: white;
+}
+
+/* Цвета при наведении для неактивных индикаторов */
+.status-indicator[data-status="new"]:hover:not(.active) {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.status-indicator[data-status="processing"]:hover:not(.active) {
+    background-color: #ff9933;
+    color: white;
+}
+
+.status-indicator[data-status="completed"]:hover:not(.active) {
+    background-color: #28a745;
+    color: white;
+}
+
+.status-indicator[data-status="cancelled"]:hover:not(.active) {
+    background-color: #dc3545;
+    color: white;
+}

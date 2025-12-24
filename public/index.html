@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>ДВЕРИ МАСТАК</title>
+    <meta name="description" content="Межкомнатные двери АЛЬБЕРО в компании ДВЕРИ МАСТАК в Губахе. Качество, доступная цена, доставка">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="styles-main.css">
+    <link rel="stylesheet" href="filters-sidebar.css">
+    <link rel="stylesheet" href="product-detail-modal.css">
+    <link rel="stylesheet" href="partner-cabinet.css">
+    <link rel="stylesheet" href="mobile.css" media="(max-width: 768px)">
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <h1>ДВЕРИ МАСТАК</h1>
+            <p>Качественные межкомнатные двери АЛЬБЕРО по доступным ценам</p>
+            <div class="header-meta">
+                <span id="last-update-date">Актуально на вечер: 5.12.2025</span>
+                <div class="auth-controls">
+                    <span id="partner-name" style="display: none;"></span>
+                    <button id="partner-btn" class="auth-btn">🔑 Вход для партнеров</button>
+                    <button id="logout-btn" class="auth-btn" style="display: none;">🚪 Выйти</button>
+                    <button id="favorites-btn" class="auth-btn cart-btn" style="display: none;">❤️ Избранное</button>
+                    <button id="cart-btn" class="auth-btn cart-btn" style="display: none;">🛒 Корзина (0)</button>
+                    <button id="feedback-btn" class="feedback-btn">💬 Обратная связь</button>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- Основной контейнер с двумя колонками -->
+    <div class="main-container">
+        <!-- Левая колонка: фильтры и поиск -->
+        <aside class="sidebar">
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Поиск по названию...">
+                <span id="clear-search">✖</span>
+            </div>
+            <div id="filters">
+                <label>
+                    Категория:
+                    <select id="category-filter">
+                        <option value="">Все</option>
+                    </select>
+                </label>
+                <div class="detailed-view-toggle">
+                    <input type="checkbox" id="detailed-view-checkbox" checked>
+                    <span>Отобразить остатки</span>
+                </div>
+                <label class="color-palette-toggle">
+                    Выбор дверей по оттенку
+                    <span class="toggle-icon"> </span>
+                </label>
+                <label>
+                    Цвет:
+                    <div class="color-filter-container">
+                        <select id="color-filter">
+                            <option value="">Все</option>
+                        </select>
+                    </div>
+                </label>
+            </div>
+            <!-- Блок пагинации -->
+            <div class="pagination-controls">
+                <label for="items-per-page">Товаров на странице:</label>
+                <select id="items-per-page">
+                    <option value="12">12</option>
+                    <option value="24" selected>24</option>
+                    <option value="48">48</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+            <!-- Переключатель режима отображения -->
+            <div class="view-mode-toggle">
+                <button id="tile-view-btn" class="view-btn active">Плитка</button>
+                <button id="list-view-btn" class="view-btn">Список</button>
+            </div>
+        </aside>
+        <!-- Панель выбора цвета (скрыта по умолчанию) -->
+        <div id="color-palette-panel" class="color-palette-panel hidden">
+            <div class="palette-header">
+                <h3>Выбор по оттенку</h3>
+                <span class="close-palette">&times;</span>
+            </div>
+            <div class="palette-grid">
+                <!-- Цвета будут добавлены динамически через JavaScript -->
+            </div>
+        </div>
+        <!-- Правая колонка: товары -->
+        <main id="products" class="tile-view">
+            <!-- Товары будут загружены динамически -->
+        </main>
+    </div>
+    <!-- Пагинация внизу -->
+    <div class="pagination-container">
+        <button id="prev-page" disabled>← Назад</button>
+        <span id="page-info">Страница 1 из 1</span>
+        <button id="next-page">Вперед →</button>
+    </div>
+    <!-- Модальное окно обратной связи -->
+    <div id="feedback-modal" class="modal hidden">
+        <div class="modal-content feedback-modal-content">
+            <div class="modal-header">
+                <h2>💬 Обратная связь</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Укажите пожелания или ошибки, которые вы нашли на сайте:</p>
+                <form id="feedback-form">
+                    <textarea id="feedback-message" name="message" placeholder="Ваше сообщение..." required></textarea>
+                    <div class="form-row">
+                        <input type="email" id="feedback-email" name="email" placeholder="Ваш email (необязательно)">
+                        <button type="submit" class="btn-primary">Отправить</button>
+                    </div>
+                </form>
+                <div id="feedback-status" class="message hidden"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Модальное окно корзины -->
+    <div id="cart-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>🛒 Ваша корзина</h2>
+            <div id="cart-items">
+                <p class="empty-cart">Ваша корзина пуста</p>
+            </div>
+            <div class="cart-total">
+                <strong>Итого:</strong> <span id="cart-total">0.00</span> ₽
+            </div>
+            <button id="checkout-btn" class="checkout-btn">Оформить заказ</button>
+        </div>
+    </div>
+    <!-- Модальное окно избранного -->
+    <div id="favorites-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>❤️ Избранное</h2>
+            <div id="favorites-items">
+                <p class="empty-favorites">Список избранного пуст</p>
+            </div>
+        </div>
+    </div>
+    <!-- Модальное окно личного кабинета партнера -->
+    <div id="partner-cabinet-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="cabinet-header">
+                <h2>Личный кабинет партнера</h2>
+            </div>
+            <div class="cabinet-tabs">
+                <button id="orders-tab" class="tab-btn active">Мои заказы</button>
+                <button id="profile-tab" class="tab-btn">Личная информация</button>
+            </div>
+            <div id="orders-content" class="tab-content active">
+                <div class="orders-toolbar">
+                    <div class="orders-toolbar-left">
+                        <select id="orders-filter" class="orders-filter">
+                            <option value="all">Все статусы</option>
+                            <option value="new">Новые</option>
+                            <option value="processing">В обработке</option>
+                            <option value="completed">Выполненные</option>
+                            <option value="cancelled">Отмененные</option>
+                        </select>
+                        <input type="text" id="orders-search" class="orders-search" placeholder="Поиск по товарам...">
+                    </div>
+                </div>
+                <div id="partner-orders-list">
+                    <p class="loading-orders">Загрузка заказов...</p>
+                </div>
+            </div>
+            <div id="profile-content" class="tab-content">
+                <form id="partner-profile-form">
+                    <div class="form-group">
+                        <label for="partner-name-input">Имя:</label>
+                        <input type="text" id="partner-name-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="partner-email-input">Email:</label>
+                        <input type="email" id="partner-email-input" required>
+                    </div>
+                    <button type="submit" class="checkout-btn">Сохранить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <p>© 2025 ДВЕРИ МАСТАК. Все права защищены.</p>
+        <div class="footer-links">
+            <!-- <a href="/admin/login">Админка</a> -->
+        </div>
+    </footer>
+    <script src="main-page.js"></script>
+    <script src="filters-sidebar.js"></script>
+    <script src="product-detail-modal.js"></script>
+    <script src="partner-cabinet.js"></script>
+    <div id="notifications-container"></div>
+</body>
+</html>

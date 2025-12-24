@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1",
+    "username": "partner1",
+    "password": "0b14d501a594442a01c6859541bcb3e8164d183d32937b851835442f69d5c94e",
+    "name": "Партнер №1",
+    "createdAt": "2025-12-08T19:42:46.514Z",
+    "companyName": "222",
+    "contactPerson": "ИП Такой Т.О.",
+    "phone": "11",
+    "email": "111@111.ru",
+    "address": "dsfadsf",
+    "inn": "",
+    "bankDetails": ""
+  }
+]

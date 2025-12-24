@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: "doors-app"
+    env: "node"
+    repo: "https://github.com/ваш-логин/название-репозитория" # ← ПОЗЖЕ ЗАМЕНИТЕ НА СВОЙ!
+    plan: "free"
+    dockerfilePath: "./Dockerfile"
