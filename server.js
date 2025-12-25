@@ -863,6 +863,70 @@ app.patch('/api/orders/:id/status', async (req, res) => {
         res.status(500).json({ error: 'Ошибка обновления статуса заказа и остатков' });
     }
 });
+// === API: Изменить номер заказа ===
+app.patch('/api/orders/:id/order-number', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { newOrderNumber } = req.body;
+    
+    if (!newOrderNumber || typeof newOrderNumber !== 'string' || newOrderNumber.trim() === '') {
+      return res.status(400).json({ error: 'Новый номер заказа обязателен и должен быть строкой' });
+    }
+    
+    // Загружаем заказы
+    const data = await fs.readFile(ORDERS_FILE, 'utf8');
+    let orders = JSON.parse(data);
+    
+    // Находим заказ
+    const orderIndex = orders.findIndex(order => order.id === orderId);
+    if (orderIndex === -1) {
+      return res.status(404).json({ error: 'Заказ не найден' });
+    }
+    
+    // Сохраняем старый ID для возможного возврата временных данных
+    const oldId = orders[orderIndex].id;
+    
+    // Проверяем, не существует ли уже заказа с таким номером
+    if (orders.some(order => order.id === newOrderNumber.trim() && order.id !== oldId)) {
+      return res.status(400).json({ error: 'Заказ с таким номером уже существует' });
+    }
+    
+    // Обновляем номер заказа
+    const updatedOrder = {
+      ...orders[orderIndex],
+      id: newOrderNumber.trim(),
+      originalId: orders[orderIndex].originalId || oldId // Сохраняем оригинальный ID для отслеживания
+    };
+    
+    // Обновляем заказ в массиве
+    orders[orderIndex] = updatedOrder;
+    
+    // Обновляем временные данные для этого заказа, если они есть
+    try {
+      const tempData = await fs.readFile(TEMP_PRODUCTS_FILE, 'utf8');
+      let tempProducts = JSON.parse(tempData);
+      
+      // Обновляем orderId во временных данных
+      tempProducts = tempProducts.map(temp => 
+        temp.orderId === oldId ? { ...temp, orderId: newOrderNumber.trim() } : temp
+      );
+      
+      await fs.writeFile(TEMP_PRODUCTS_FILE, JSON.stringify(tempProducts, null, 2), 'utf8');
+    } catch (e) {
+      console.warn('Не удалось обновить временные данные:', e);
+    }
+    
+    // Сохраняем обновленные заказы
+    await fs.writeFile(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
+    
+    console.log(`Номер заказа изменен: ${oldId} -> ${newOrderNumber.trim()}`);
+    res.json({ success: true, order: updatedOrder });
+    
+  } catch (err) {
+    console.error('Ошибка обновления номера заказа:', err);
+    res.status(500).json({ error: 'Ошибка обновления номера заказа' });
+  }
+});
 // === API: Получить временные данные (товары "в обработке") ===
 app.get('/api/temp-products', async (req, res) => {
     try {

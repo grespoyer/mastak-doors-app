@@ -62,24 +62,24 @@ const checkoutBtn = document.getElementById('checkout-btn');
 initUserStorage();
 // Инициализация пользовательского хранилища
 function initUserStorage() {
-    // Пытаемся получить данные партнера из localStorage
-    const storedPartner = localStorage.getItem('partner');
-    if (storedPartner) {
-        partner = JSON.parse(storedPartner);
-        // Загружаем данные партнера
-        favorites = loadUserData('favorites', []);
-        cart = loadUserData('cart', []);
-    } else {
-        // Для анонимного пользователя создаем уникальный ID сессии
-        let sessionId = localStorage.getItem('sessionId');
-        if (!sessionId) {
-            sessionId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('sessionId', sessionId);
-        }
-        // Загружаем данные анонимного пользователя
-        favorites = loadUserData('favorites_anon_' + sessionId, []);
-        cart = loadUserData('cart_anon_' + sessionId, []);
+  // Пытаемся получить данные партнера из localStorage
+  const storedPartner = localStorage.getItem('partner');
+  if (storedPartner) {
+    partner = JSON.parse(storedPartner);
+    // Загружаем данные партнера
+    favorites = loadUserData('favorites', []);
+    cart = loadUserData('cart', []);
+  } else {
+    // Для анонимного пользователя создаем уникальный ID сессии
+    let sessionId = localStorage.getItem('sessionId');
+    if (!sessionId) {
+      sessionId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('sessionId', sessionId);
     }
+    // Загружаем данные анонимного пользователя - ИСПРАВЛЕНО ЗДЕСЬ
+    favorites = loadUserData('favorites', []);
+    cart = loadUserData('cart', []);
+  }
 }
 // Загрузка пользовательских данных с учетом типа пользователя
 function loadUserData(key, defaultValue) {
@@ -1706,7 +1706,7 @@ function showOrderForm(isPartner) {
             <h2>${isPartner ? 'Оформление заказа для партнера' : 'Оформление заказа'}</h2>
             <form id="order-form">
                 <div class="form-group">
-                    <label for="customer-name">ФИО клиента *</label>
+                    <label for="customer-name">ФИО *</label>
                     <input type="text" id="customer-name" name="customer-name" value="${defaultCustomerName}" required>
                 </div>
     `;

@@ -133,27 +133,17 @@ function renderPartnerOrders(filterStatus = 'all', searchTerm = '') {
         }).join('');
         
         html += `
-            <div class="order-item" data-order-id="${order.id}">
-                <div class="order-header">
-                    <span class="order-id">Заказ #${order.id}</span>
-                    <span class="order-date">${formattedDate}</span>
-                    <span class="order-total">${order.total.toFixed(2)} ₽</span>
-                    <span class="order-status ${statusClass}">${statusText}</span>
-                </div>
-                <div class="order-items">
-                    ${itemsHtml}
-                    ${order.comments ? `
-                    <div class="order-comments">
-                        <strong>Комментарий:</strong> ${order.comments}
-                    </div>
-                    ` : ''}
-                    ${hasOutOfStockItems ? `
-                    <div class="order-notice">
-                        <p class="notice-warning">⚠️ Некоторые товары в этом заказе будут поставлены под заказ. С вами свяжется менеджер для уточнения сроков поставки.</p>
-                    </div>
-                    ` : ''}
-                </div>
-            </div>
+        <div class="order-item" data-order-id="${order.id}">
+        <div class="order-header">
+            <span class="order-id">Заказ #${order.id}</span>
+            <span class="order-date">${formattedDate}</span>
+            <span class="order-total">${order.total.toFixed(2)} ₽</span>
+            <span class="order-status ${statusClass}">${statusText}</span>
+        </div>
+        <div class="order-items">
+            ${generateInvoiceHTML(order)}
+        </div>
+        </div>
         `;
     });
     ordersList.innerHTML = html;
@@ -179,6 +169,68 @@ function getStatusText(status) {
         'cancelled': 'Отменен'
     };
     return statuses[status] || status;
+}
+// пкуызщнук
+// Генерация HTML для отображения счета
+function generateInvoiceHTML(order) {
+  const orderDate = new Date(order.createdAt);
+  const formattedDate = `${orderDate.getDate()}.${orderDate.getMonth() + 1}.${orderDate.getFullYear()}`;
+  const invoiceNumber = order.id;
+
+  let itemsHtml = '';
+  let totalQuantity = 0;
+  let totalAmount = 0;
+
+  order.items.forEach((item, index) => {
+    const itemTotal = item.price * item.quantity;
+    itemsHtml += `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${item.name}<br>${item.description || ''}</td>
+        <td>шт.</td>
+        <td>${item.quantity}</td>
+        <td>${item.price.toFixed(2)}</td>
+        <td>${itemTotal.toFixed(2)}</td>
+      </tr>
+    `;
+    totalQuantity += item.quantity;
+    totalAmount += itemTotal;
+  });
+
+  // Пример суммы прописью (можно заменить на реальную реализацию)
+  const amountInWords = 'Четыреста семьдесят четыре рубля 00 копеек';
+
+  return `
+    <div class="invoice-preview" style="padding: 15px; background: white;">
+      <h3 style="text-align: center; margin-top: 0;">СЧЕТ № ${invoiceNumber} от ${formattedDate}</h3>
+      <table border="1" cellpadding="5" cellspacing="0" style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Наименование</th>
+            <th>Ед. изм</th>
+            <th>Кол-во</th>
+            <th>Цена</th>
+            <th>Сумма</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+          <tr>
+            <td colspan="3">Итого:</td>
+            <td>${totalQuantity}</td>
+            <td></td>
+            <td>${totalAmount.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Сумма прописью: ${amountInWords}</p>
+      <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+        <div>Руководитель _______________</div>
+        <div>Бухгалтер _______________</div>
+      </div>
+    </div>
+  `;
 }
 // Переключение вкладок в личном кабинете с сохранением позиции скролла
 function switchTab(tabName) {

@@ -51,6 +51,76 @@ function setupEventListeners() {
         const orderId = document.getElementById('orderId').textContent;
         showDeleteConfirmation(orderId);
     });
+    document.getElementById('saveOrderNumberBtn').addEventListener('click', async () => {
+    const orderId = document.getElementById('orderId').textContent;
+    const newOrderNumber = document.getElementById('editOrderNumber').value.trim();
+    
+    if (!newOrderNumber) {
+        alert('Номер заказа не может быть пустым');
+        return;
+    }
+    
+    if (newOrderNumber === orderId) {
+        return; // Ничего не изменилось
+    }
+    
+    if (!confirm(`Вы уверены, что хотите изменить номер заказа с ${orderId} на ${newOrderNumber}? Это действие нельзя отменить.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/orders/${orderId}/order-number`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ newOrderNumber })
+        });
+        
+        if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка обновления номера заказа');
+        }
+        
+        const result = await response.json();
+        
+        // Обновляем данные в локальном массиве
+        const orderIndex = allOrders.findIndex(o => o.id === orderId);
+        if (orderIndex !== -1) {
+        // Обновляем ID заказа во всех связанных данных
+        allOrders[orderIndex] = {
+            ...allOrders[orderIndex],
+            ...result.order
+        };
+        
+        // Обновляем ID в выделенных заказах, если он там есть
+        selectedOrders = selectedOrders.map(id => id === orderId ? newOrderNumber : id);
+        
+        // Обновляем отображение
+        document.getElementById('orderId').textContent = newOrderNumber;
+        document.getElementById('editOrderNumber').value = newOrderNumber;
+        
+        // Обновляем номер заказа в таблице и деталях
+        document.querySelectorAll(`tr[data-id="${orderId}"]`).forEach(row => {
+            row.dataset.id = newOrderNumber;
+            row.querySelector('.order-id').textContent = `#${newOrderNumber}`;
+            
+            // Обновляем data-id в кнопках действий
+            row.querySelectorAll('[data-id]').forEach(el => {
+            if (el.dataset.id === orderId) {
+                el.dataset.id = newOrderNumber;
+            }
+            });
+        });
+        }
+        
+        showMessage('Номер заказа успешно изменен!', 'success');
+        renderOrders();
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showMessage('❌ Ошибка обновления номера заказа: ' + error.message, 'error');
+    }
+    });
 }
 
 function setupLogout() {
@@ -247,6 +317,8 @@ async function showOrderDetails(orderId) {
     if (!order) return;
     
     document.getElementById('orderId').textContent = orderId;
+    // Заполняем поле номера заказа
+    document.getElementById('editOrderNumber').value = orderId;
     
     let itemsHtml = `
         <h3>Товары в заказе:</h3>

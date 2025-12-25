@@ -81,6 +81,13 @@
         <div id="orderDetailsModal" class="modal hidden">
             <div class="modal-content">
                 <span class="close">&times;</span>
+                <div class="form-group order-edit-section">
+                <label>Номер заказа:</label>
+                <div class="order-edit-field">
+                    <input type="text" id="editOrderNumber" class="edit-field">
+                    <button class="btn btn-sm btn-primary save-btn" id="saveOrderNumberBtn">💾 Сохранить</button>
+                </div>
+                </div>                
                 <h2>Детали заказа #<span id="orderId"></span></h2>
                 <div id="orderDetailsContent"></div>
                 <button class="btn btn-danger delete-order-btn" id="deleteOrderBtn">🗑️ Удалить заказ</button>
