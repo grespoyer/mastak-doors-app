@@ -1,6 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
-
+// grespoyer
 const MAPPING_FILE = path.join(__dirname, 'mapping.json');
 const PRODUCTS_FILE = path.join(__dirname, 'products.json');
 
@@ -45,6 +45,7 @@ async function syncProducts() {
             product.images = item.images || [];
             product.item = item.item || "000000";           // 🔥 Копируем артикул
             product.stockProgram = item.stockProgram || 0;  // 🔥 Копируем складскую программу
+            product.expectedDeliveryDate = item.expectedDeliveryDate || null;
 
             console.log(`🔄 Обновлён: ${product.name} (id: ${item.id}) -> stock: ${product.stock}, item: ${product.item}, stockProgram: ${product.stockProgram}`);
             updatedCount++;
@@ -62,7 +63,8 @@ async function syncProducts() {
                 images: item.images || [],
                 createdAt: new Date().toISOString(),
                 item: item.item || "000000",           // 🔥 Добавляем артикул
-                stockProgram: item.stockProgram || 0   // 🔥 Добавляем складскую программу
+                stockProgram: item.stockProgram || 0,   // 🔥 Добавляем складскую программу
+                expectedDeliveryDate: item.expectedDeliveryDate || null // <-- новое поле
             };
             products.push(newProduct);
             console.log(`➕ Добавлен: ${newProduct.name} (id: ${newProduct.id}) -> stock: ${newProduct.stock}, item: ${newProduct.item}, stockProgram: ${newProduct.stockProgram}`);

@@ -1,3 +1,5 @@
 node_modules/
 orders.json
+feedback.json
+TOQWEN.html
 .env

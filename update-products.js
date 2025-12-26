@@ -1,10 +1,26 @@
 const XLSX = require('xlsx');
 const fs = require('fs').promises;
 const path = require('path');
-
+// grespoyer
 const INPUT_DIR = path.join(__dirname, 'input');
 const MAPPING_FILE = path.join(__dirname, 'mapping.json');
 
+// Определение вторника
+function getNextTuesday() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 - воскресенье, 1 - понедельник, 2 - вторник и т.д.
+  let daysToAdd = 2 - dayOfWeek; // 2 - вторник
+  if (daysToAdd <= 0) {
+    daysToAdd += 7; // если сегодня вторник или позже на этой неделе
+  }
+  const nextTuesday = new Date(today);
+  nextTuesday.setDate(today.getDate() + daysToAdd);
+  // Форматируем дату как ДД.ММ.ГГГГ
+  const day = String(nextTuesday.getDate()).padStart(2, '0');
+  const month = String(nextTuesday.getMonth() + 1).padStart(2, '0');
+  const year = nextTuesday.getFullYear();
+  return `${day}.${month}.${year}`;
+}
 // === Функция поиска Excel-файла ===
 function findExcelFile() {
     const inputFiles = require('fs').readdirSync(INPUT_DIR);
@@ -71,7 +87,8 @@ async function updateMappingFromExcel() {
         if (typeof name !== 'string') continue; // Пропускаем, если не строка
 
         const stock = parseInt(cellB?.v || 0);
-
+        const columnC = worksheet[XLSX.utils.encode_cell({ c: 2, r: rowNum })]; // Столбец С (индекс 2)
+        const hasDeliveryInfo = columnC && columnC.v !== undefined && columnC.v !== null && columnC.v !== '';
         // Если записи с таким именем ещё нет в mapping, создаём её с минимальными данными
         if (!mapping[name]) {
             // Определяем, нужно ли игнорировать строку
@@ -106,12 +123,16 @@ async function updateMappingFromExcel() {
                 createdAt: new Date().toISOString(),
                 ignore: ignore,
                 item: "000000",       // 🔥 Новое поле: артикул
-                stockProgram: 0        // 🔥 Новое поле: складская программа (0 — заказное, 1 — складское)
+                stockProgram: 0,        // 🔥 Новое поле: складская программа (0 — заказное, 1 — складское)
+                expectedDeliveryDate: hasDeliveryInfo ? getNextTuesday() : null // <-- новое поле
             };
         } else {
             // Если запись существует, обновляем только stock, item и stockProgram (если они есть в Excel?)
             // В текущей логике мы не читаем C/D колонки — поэтому оставляем их без изменений
             mapping[name].stock = stock;
+            if (hasDeliveryInfo) {
+                mapping[name].expectedDeliveryDate = getNextTuesday();
+            }
             // Если хочешь читать артикул и программу из Excel — нужно расширить логику
             // Пока просто оставляем существующие значения
         }

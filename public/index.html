@@ -109,9 +109,11 @@
             <div class="modal-body">
                 <p>Укажите пожелания или ошибки, которые вы нашли на сайте:</p>
                 <form id="feedback-form">
-                    <textarea id="feedback-message" name="message" placeholder="Ваше сообщение..." required></textarea>
+                    <div class="feedback-textarea-container"></div>
+                        <textarea id="feedback-message" name="message" placeholder="Ваше сообщение..." required></textarea>
+                    </div>
                     <div class="form-row">
-                        <input type="email" id="feedback-email" name="email" placeholder="Ваш email (необязательно)">
+                        <input type="email" id="feedback-email" name="email" placeholder="Ваш e-mail (необязательно)">
                         <button type="submit" class="btn-primary">Отправить</button>
                     </div>
                 </form>
@@ -188,13 +190,22 @@
     </div>
     <footer>
         <p>© 2025 ДВЕРИ МАСТАК. Все права защищены.</p>
-        <div class="footer-links">
-        </div>
     </footer>
     <script src="main-page.js"></script>
     <script src="filters-sidebar.js"></script>
     <script src="product-detail-modal.js"></script>
     <script src="partner-cabinet.js"></script>
     <div id="notifications-container"></div>
+    <!--grespoyer-->
+    <div id="cookies-banner" class="cookies-banner hidden">
+        <div class="cookies-content">
+            <p>Мы используем cookie для улучшения вашего опыта на сайте. Нажимая "Согласен", вы даете согласие на обработку персональных данных и использование cookies.</p>
+            <div class="cookies-buttons">
+                <button id="cookies-accept" class="btn-primary">Согласен</button>
+                <button id="cookies-decline" class="btn-secondary">Отклонить</button>
+                <!--<a href="/privacy-policy" target="_blank" class="privacy-link">Политика конфиденциальности</a>-->
+            </div>
+        </div>
+    </div>    
 </body>
 </html>
