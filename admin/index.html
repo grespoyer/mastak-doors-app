@@ -1,208 +1,213 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Админка ДВЕРИ МАСТАК</title>
-    <link rel="stylesheet" href="/admin/styles.css">
-    <link rel="stylesheet" href="/admin/products.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админка ДВЕРИ МАСТАК</title>
+<link rel="stylesheet" href="/admin/styles.css">
+<link rel="stylesheet" href="/admin/products.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🚪 Админка: Управление товарами</h1>
-            <div class="header-meta">
-                <span id="last-update-date">Актуально на: 5.12.2025</span>
-            </div>
-            <div class="header-actions">
-                <nav class="tabs">
-                    <a href="/admin/" class="tab active">Товары</a>
-                    <a href="/admin/orders.html" class="tab">
-                        Заказы
-                        <span class="badge new-orders-badge" id="newOrdersBadge" style="display: none;">0</span>
-                    </a>
-                </nav>
-                <button class="btn btn-primary" id="toggleFormBtn">➕ Добавить товар</button>
-                <button class="btn btn-primary settings-btn" id="openSettingsBtn">⚙️ Настройки</button>
-                <a href="#" class="logout" id="logoutBtn">🚪 Выйти</a>
-            </div>
-        </header>
-        <div class="dashboard">
-            <div class="card form-card hidden" id="formCard">
-                <div class="card-header">
-                    <h2 class="card-title" id="formTitle">➕ Добавить новую дверь</h2>
-                    <button class="btn btn-danger" id="cancelFormBtn">❌ Закрыть</button>
-                </div>
-                <form id="productForm" enctype="multipart/form-data">
-                    <input type="hidden" name="id" id="productId">
-                    <input type="hidden" name="imagesToDelete" id="imagesToDelete" value="">
-                    <div class="form-group">
-                        <label>Название товара:</label>
-                        <input type="text" name="name" required placeholder="ВЕНА, МИЛАН и т.д.">
-                    </div>
-                    <div class="form-group">
-                        <label>Цена (₽):</label>
-                        <input type="number" name="price" step="0.01" required placeholder="4000">
-                    </div>
-                    <div class="form-group">
-                        <label>Категория:</label>
-                        <div class="category-input-group">
-                            <select name="category" id="formCategorySelect">
-                                <option value="">Выберите или введите новую</option>
-                                <option value="Межкомнатные двери">Межкомнатные двери</option>
-                                <option value="Двери со стеклом">Двери со стеклом</option>
-                                <option value="Слайдеры">Слайдеры</option>
-                                <option value="ignore">Игнорировать</option>
-                            </select>
-                            <input type="text" id="formCategoryCustom" placeholder="Или введите новую категорию">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Цвет:</label>
-                        <input type="text" name="color" placeholder="дуб нордик, белый">
-                    </div>
-                    <div class="form-group">
-                        <label>Стекло:</label>
-                        <input type="text" name="glass" placeholder="Мателюкс, сатин">
-                    </div>
-                    <div class="form-group">
-                        <label>Ширина (мм):</label>
-                        <input type="number" name="size" min="400" max="1000" placeholder="600">
-                    </div>
-                    <div class="form-group">
-                        <label>Остаток на складе (шт):</label>
-                        <input type="number" name="stock" min="0" value="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Артикул:</label>
-                        <input type="text" name="item" placeholder="000000">
-                    </div>
-                    <div class="form-group">
-                        <label>Складская программа:</label>
-                        <input type="number" name="stockProgram" min="0" placeholder="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Изображения товара:</label>
-                        <div class="file-input-container" id="dropZone">
-                            <i>🖼️</i>
-                            <p>Перетащите изображения сюда или нажмите для выбора</p>
-                            <input type="file" id="fileInput" name="images" multiple accept="image/*">
-                        </div>
-                        <div class="image-preview" id="imagePreview"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary" id="submitBtn">➕ Добавить дверь</button>
-                </form>
-                <div class="message" id="formMessage"></div>
-                <div class="message debug-message" id="debugMessage" style="display: none;"></div>
-            </div>
-            <div class="card products-card" id="productsCard">
-                <div class="card-header">
-                    <h2 class="card-title">📋 Список дверей</h2>
-                    <div class="search-actions">
-                        <select id="categoryFilter" class="search-input">
-                            <option value="all">Все категории</option>
-                        </select>
-                        <input type="text" id="productSearch" placeholder="Поиск по всем товарам..." class="search-input">
-                        <button class="btn btn-warning" id="bulkEditBtn">✏️ Массовое редактирование</button>
-                        <button class="btn btn-success" id="checkUpdateBtn">🔄 Сверить/Обновить</button>
-                    </div>
-                </div>
-                <div id="updateStatus" class="message" style="display: none;"></div>
-                <div class="table-container" id="tableContainer">
-                    <table class="product-table">
-                        <thead>
-                            <tr id="tableHeaders"></tr>
-                        </thead>
-                        <tbody id="productsTableBody"></tbody>
-                    </table>
-                </div>
-                <div class="pagination-controls" id="paginationControls">
-                    <div class="pagination-info" id="paginationInfo">Показано 0 из 0 товаров</div>
-                    <div class="pagination-buttons">
-                        <button class="btn btn-outline" id="prevPageBtn" disabled>← Назад</button>
-                        <div id="pageNumbers"></div>
-                        <button class="btn btn-outline" id="nextPageBtn">Вперед →</button>
-                    </div>
-                </div>
-                <div id="noProductsMessage" style="text-align: center; padding: 30px; color: var(--gray);">
-                    <p>Нет добавленных товаров</p>
-                </div>
-            </div>
-        </div>
-        <div id="settingsModal" class="modal hidden">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>⚙️ Настройки системы</h2>
-                <div class="settings-section">
-                    <h3>Показывать товаров на странице:</h3>
-                    <div class="form-group">
-                        <select id="itemsPerPage" class="search-input">
-                            <option value="5">5</option>
-                            <option value="10" selected>10</option>
-                            <option value="25">25</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                            <option value="all">Все</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <h3>Отображаемые колонки в таблице:</h3>
-                    <div class="form-group">
-                        <p>Выберите колонки, которые будут отображаться в списке:</p>
-                        <div id="columnsList" class="categories-list"></div>
-                        <div class="message" id="columnsMessage"></div>
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <h3>Категории для отображения на сайте:</h3>
-                    <div class="form-group">
-                        <p>Выберите категории, которые будут отображаться на сайте:</p>
-                        <div id="categoriesList" class="categories-list"></div>
-                        <div class="message" id="categoriesMessage"></div>
-                    </div>
-                </div>
-                <button class="btn btn-primary" id="saveSettingsBtn">💾 Сохранить настройки</button>
-            </div>
-        </div>
-        <div id="bulkEditModal" class="modal hidden">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>Массовое редактирование</h2>
-                <div class="form-group">
-                    <label>Категория:</label>
-                    <div class="category-input-group">
-                        <select id="bulkCategorySelect">
-                            <option value="">Не менять</option>
-                            <option value="Межкомнатные двери">Межкомнатные двери</option>
-                            <option value="Двери со стеклом">Двери со стеклом</option>
-                            <option value="Слайдеры">Слайдеры</option>
-                            <option value="ignore">Игнорировать</option>
-                        </select>
-                        <input type="text" id="bulkCategoryCustom" placeholder="Или введите новую категорию">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Цвет:</label>
-                    <input type="text" id="bulkColor" placeholder="Оставить без изменений">
-                </div>
-                <div class="form-group">
-                    <label>Складская программа:</label>
-                    <input type="number" id="bulkStockProgram" placeholder="Оставить без изменений">
-                </div>
-                <div class="form-group">
-                    <label>Артикул:</label>
-                    <input type="text" id="bulkItem" placeholder="Оставить без изменений">
-                </div>
-                <div class="form-group">
-                    <label>Цена (₽):</label>
-                    <input type="number" step="0.01" id="bulkPrice" placeholder="Оставить без изменений">
-                </div>
-                <button class="btn btn-warning" id="applyBulkEdit">Применить изменения</button>
-                <button class="btn btn-danger" id="deleteSelectedBtn">🗑️ Удалить выбранные товары</button>
-            </div>
-        </div>
-    </div>
-    <script src="/admin/script.js"></script>
+<div class="container">
+<header>
+<div class="page-title">
+<h1>🚪 Админка: Управление товарами</h1>
+<div class="header-meta">
+<span id="last-update-date">Актуально на: 5.12.2025</span>
+</div>
+</div>
+<div class="tabs-container">
+<nav class="tabs">
+<a href="/admin/" class="tab active">Товары</a>
+<a href="/admin/orders.html" class="tab">
+Заказы
+<span class="badge new-orders-badge" id="newOrdersBadge" style="display: none;">0</span>
+</a>
+<a href="/admin/partners.html" class="tab">Партнеры</a>
+</nav>
+</div>
+<div class="header-actions">
+<button class="btn btn-primary" id="toggleFormBtn">➕ Добавить товар</button>
+<button class="btn btn-primary settings-btn" id="openSettingsBtn">⚙️ Настройки</button>
+<button class="btn" onclick="logout()">🚪 Выйти</button>
+</div>
+</header>
+<div class="dashboard">
+<div class="card form-card hidden" id="formCard">
+<div class="card-header">
+<h2 class="card-title" id="formTitle">➕ Добавить новую дверь</h2>
+<button class="btn btn-danger" id="cancelFormBtn">❌ Закрыть</button>
+</div>
+<form id="productForm" enctype="multipart/form-data">
+<input type="hidden" name="id" id="productId">
+<input type="hidden" name="imagesToDelete" id="imagesToDelete" value="">
+<div class="form-group">
+<label>Название товара:</label>
+<input type="text" name="name" required placeholder="ВЕНА, МИЛАН и т.д.">
+</div>
+<div class="form-group">
+<label>Цена (₽):</label>
+<input type="number" name="price" step="0.01" required placeholder="4000">
+</div>
+<div class="form-group">
+<label>Категория:</label>
+<div class="category-input-group">
+<select name="category" id="formCategorySelect">
+<option value="">Выберите или введите новую</option>
+<option value="Межкомнатные двери">Межкомнатные двери</option>
+<option value="Двери со стеклом">Двери со стеклом</option>
+<option value="Слайдеры">Слайдеры</option>
+<option value="ignore">Игнорировать</option>
+</select>
+<input type="text" id="formCategoryCustom" placeholder="Или введите новую категорию">
+</div>
+</div>
+<div class="form-group">
+<label>Цвет:</label>
+<input type="text" name="color" placeholder="дуб нордик, белый">
+</div>
+<div class="form-group">
+<label>Стекло:</label>
+<input type="text" name="glass" placeholder="Мателюкс, сатин">
+</div>
+<div class="form-group">
+<label>Ширина (мм):</label>
+<input type="number" name="size" min="400" max="1000" placeholder="600">
+</div>
+<div class="form-group">
+<label>Остаток на складе (шт):</label>
+<input type="number" name="stock" min="0" value="0" required>
+</div>
+<div class="form-group">
+<label>Артикул:</label>
+<input type="text" name="item" placeholder="000000">
+</div>
+<div class="form-group">
+<label>Складская программа:</label>
+<input type="number" name="stockProgram" min="0" placeholder="1">
+</div>
+<div class="form-group">
+<label>Изображения товара:</label>
+<div class="file-input-container" id="dropZone">
+<i>🖼️</i>
+<p>Перетащите изображения сюда или нажмите для выбора</p>
+<input type="file" id="fileInput" name="images" multiple accept="image/*">
+</div>
+<div class="image-preview" id="imagePreview"></div>
+</div>
+<button type="submit" class="btn btn-primary" id="submitBtn">➕ Добавить дверь</button>
+</form>
+<div class="message" id="formMessage"></div>
+<div class="message debug-message" id="debugMessage" style="display: none;"></div>
+</div>
+<div class="card products-card" id="productsCard">
+<div class="card-header">
+<h2 class="card-title">📋 Список дверей</h2>
+<div class="search-actions">
+<select id="categoryFilter" class="search-input">
+<option value="all">Все категории</option>
+</select>
+<input type="text" id="productSearch" placeholder="Поиск по всем товарам..." class="search-input">
+<button class="btn btn-warning" id="bulkEditBtn">✏️ Массовое редактирование</button>
+<button class="btn btn-success" id="checkUpdateBtn">🔄 Сверить/Обновить</button>
+</div>
+</div>
+<div id="updateStatus" class="message" style="display: none;"></div>
+<div class="table-container" id="tableContainer">
+<table class="product-table">
+<thead>
+<tr id="tableHeaders"></tr>
+</thead>
+<tbody id="productsTableBody"></tbody>
+</table>
+</div>
+<div class="pagination-controls" id="paginationControls">
+<div class="pagination-info" id="paginationInfo">Показано 0 из 0 товаров</div>
+<div class="pagination-buttons">
+<button class="btn btn-outline" id="prevPageBtn" disabled>← Назад</button>
+<div id="pageNumbers"></div>
+<button class="btn btn-outline" id="nextPageBtn">Вперед →</button>
+</div>
+</div>
+<div id="noProductsMessage" style="text-align: center; padding: 30px; color: var(--gray);">
+<p>Нет добавленных товаров</p>
+</div>
+</div>
+</div>
+<div id="settingsModal" class="modal hidden">
+<div class="modal-content">
+<span class="close">&times;</span>
+<h2>⚙️ Настройки системы</h2>
+<div class="settings-section">
+<h3>Показывать товаров на странице:</h3>
+<div class="form-group">
+<select id="itemsPerPage" class="search-input">
+<option value="5">5</option>
+<option value="10" selected>10</option>
+<option value="25">25</option>
+<option value="50">50</option>
+<option value="100">100</option>
+<option value="all">Все</option>
+</select>
+</div>
+</div>
+<div class="settings-section">
+<h3>Отображаемые колонки в таблице:</h3>
+<div class="form-group">
+<p>Выберите колонки, которые будут отображаться в списке:</p>
+<div id="columnsList" class="categories-list"></div>
+<div class="message" id="columnsMessage"></div>
+</div>
+</div>
+<div class="settings-section">
+<h3>Категории для отображения на сайте:</h3>
+<div class="form-group">
+<p>Выберите категории, которые будут отображаться на сайте:</p>
+<div id="categoriesList" class="categories-list"></div>
+<div class="message" id="categoriesMessage"></div>
+</div>
+</div>
+<button class="btn btn-primary" id="saveSettingsBtn">💾 Сохранить настройки</button>
+</div>
+</div>
+<div id="bulkEditModal" class="modal hidden">
+<div class="modal-content">
+<span class="close">&times;</span>
+<h2>Массовое редактирование</h2>
+<div class="form-group">
+<label>Категория:</label>
+<div class="category-input-group">
+<select id="bulkCategorySelect">
+<option value="">Не менять</option>
+<option value="Межкомнатные двери">Межкомнатные двери</option>
+<option value="Двери со стеклом">Двери со стеклом</option>
+<option value="Слайдеры">Слайдеры</option>
+<option value="ignore">Игнорировать</option>
+</select>
+<input type="text" id="bulkCategoryCustom" placeholder="Или введите новую категорию">
+</div>
+</div>
+<div class="form-group">
+<label>Цвет:</label>
+<input type="text" id="bulkColor" placeholder="Оставить без изменений">
+</div>
+<div class="form-group">
+<label>Складская программа:</label>
+<input type="number" id="bulkStockProgram" placeholder="Оставить без изменений">
+</div>
+<div class="form-group">
+<label>Артикул:</label>
+<input type="text" id="bulkItem" placeholder="Оставить без изменений">
+</div>
+<div class="form-group">
+<label>Цена (₽):</label>
+<input type="number" step="0.01" id="bulkPrice" placeholder="Оставить без изменений">
+</div>
+<button class="btn btn-warning" id="applyBulkEdit">Применить изменения</button>
+<button class="btn btn-danger" id="deleteSelectedBtn">🗑️ Удалить выбранные товары</button>
+</div>
+</div>
+</div>
+<script src="/admin/script.js"></script>
 </body>
 </html>

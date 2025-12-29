@@ -187,7 +187,7 @@ function populateColorPalette() {
         const imageNumber = index + 1;
         
         const img = document.createElement('img');
-        img.src = `uploads/palette/${imageNumber}.jpg`;
+        img.src = `/uploads/palette/${imageNumber}.jpg`;
         img.alt = colorName;
         img.onerror = function() {
             this.style.display = 'none';

@@ -64,55 +64,111 @@ const checkoutBtn = document.getElementById('checkout-btn');
 initUserStorage();
 // Инициализация пользовательского хранилища
 function initUserStorage() {
-    // Пытаемся получить данные партнера из localStorage
-    const storedPartner = localStorage.getItem('partner');
-    if (storedPartner) {
-        partner = JSON.parse(storedPartner);
-        // Загружаем данные партнера
-        favorites = loadUserData('favorites', []);
-        cart = loadUserData('cart', []);
-        customerData = loadUserData('customerData', {});
-    } else {
-        // Для анонимного пользователя создаем уникальный ID сессии
-        let sessionId = localStorage.getItem('sessionId');
-        if (!sessionId) {
-            sessionId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('sessionId', sessionId);
-        }
-        // Загружаем данные анонимного пользователя
-        favorites = loadUserData('favorites', []);
-        cart = loadUserData('cart', []);
-        customerData = loadUserData('customerData', {});
+  // Пытаемся получить данные партнера из localStorage
+  const storedPartner = localStorage.getItem('partner');
+  if (storedPartner) {
+    try {
+      partner = JSON.parse(storedPartner);
+      // Загружаем данные партнера используя его ID
+      favorites = loadUserData(`partner_${partner.id}_favorites`, []);
+      cart = loadUserData(`partner_${partner.id}_cart`, []);
+      customerData = loadUserData(`partner_${partner.id}_customerData`, {});
+      return;
+    } catch (e) {
+      console.error('Ошибка при загрузке данных партнера:', e);
+      // Если есть ошибка при загрузке партнера, очищаем данные
+      localStorage.removeItem('partner');
     }
+  }
+  
+  // Для анонимного пользователя создаем уникальный ID сессии
+  let sessionId = localStorage.getItem('sessionId');
+  if (!sessionId) {
+    sessionId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('sessionId', sessionId);
+  }
+  // Загружаем данные анонимного пользователя
+  favorites = loadUserData(`anon_${sessionId}_favorites`, []);
+  cart = loadUserData(`anon_${sessionId}_cart`, []);
+  customerData = loadUserData(`anon_${sessionId}_customerData`, {});
 }
 // Загрузка пользовательских данных с учетом типа пользователя
 function loadUserData(key, defaultValue) {
-    const cookiesAccepted = localStorage.getItem('cookiesAccepted');
-    if (!cookiesAccepted) {
-        return defaultValue;
-    }
-    
+  const cookiesAccepted = localStorage.getItem('cookiesAccepted') === 'true';
+  if (!cookiesAccepted) {
+    return defaultValue;
+  }
+  
+  try {
     if (partner) {
-        return JSON.parse(localStorage.getItem(`partner_${partner.id}_${key}`) || JSON.stringify(defaultValue));
+      const encryptedData = localStorage.getItem(`partner_${partner.id}_${key}`);
+      if (!encryptedData) return defaultValue;
+      
+      // Простая дополнительная проверка целостности данных
+      const parsedData = JSON.parse(encryptedData);
+      if (!parsedData || typeof parsedData !== 'object' || !parsedData.value) {
+        return defaultValue;
+      }
+      
+      return parsedData.value;
     } else {
-        const sessionId = localStorage.getItem('sessionId');
-        return JSON.parse(localStorage.getItem(`anon_${sessionId}_${key}`) || JSON.stringify(defaultValue));
+      const sessionId = localStorage.getItem('sessionId');
+      if (!sessionId) return defaultValue;
+      
+      const encryptedData = localStorage.getItem(`anon_${sessionId}_${key}`);
+      if (!encryptedData) return defaultValue;
+      
+      const parsedData = JSON.parse(encryptedData);
+      if (!parsedData || typeof parsedData !== 'object' || !parsedData.value) {
+        return defaultValue;
+      }
+      
+      return parsedData.value;
     }
+  } catch (e) {
+    console.error('Ошибка загрузки данных:', e);
+    return defaultValue;
+  }
 }
 // Сохранение пользовательских данных с учетом типа пользователя
+function encryptData(data) {
+  // В реальном приложении здесь должно быть настоящее шифрование
+  // Для примера используем base64 + метаданные
+  const timestamp = Date.now();
+  return {
+    value: data,
+    timestamp: timestamp,
+    integrity: btoa(JSON.stringify({ timestamp, value: JSON.stringify(data) }))
+  };
+}
+
 function saveUserData(key, value) {
-    const cookiesAccepted = localStorage.getItem('cookiesAccepted');
-    if (!cookiesAccepted) {
-        // Если пользователь не согласился на cookies, не сохраняем данные
-        return;
+  const cookiesAccepted = localStorage.getItem('cookiesAccepted') === 'true';
+  if (!cookiesAccepted) {
+    return;
+  }
+  
+  try {
+    // Определяем префикс для ключа в зависимости от типа пользователя
+    let storageKey;
+    if (partner) {
+      storageKey = `partner_${partner.id}_${key}`;
+    } else {
+      const sessionId = localStorage.getItem('sessionId');
+      if (!sessionId) return;
+      storageKey = `anon_${sessionId}_${key}`;
     }
     
-    if (partner) {
-        localStorage.setItem(`partner_${partner.id}_${key}`, JSON.stringify(value));
-    } else {
-        const sessionId = localStorage.getItem('sessionId');
-        localStorage.setItem(`anon_${sessionId}_${key}`, JSON.stringify(value));
-    }
+    // Простое шифрование/сериализация
+    const encryptedData = {
+      value: value,
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem(storageKey, JSON.stringify(encryptedData));
+  } catch (e) {
+    console.error('Ошибка сохранения данных:', e);
+  }
 }
 // Cookies
 // Инициализация баннера cookies
@@ -218,12 +274,11 @@ function renderProductsTileView(productGroups) {
         let imageHtml = '';
         if (firstProduct.images && firstProduct.images[0]) {
             imageHtml = `
-                <img 
-                    src="${firstProduct.images[0]}" 
-                    alt="${firstProduct.name}" 
-                    class="product-image" 
-                    data-group-name="${firstProduct.name}"
-                    onerror="this.onerror=null; this.style.display='none'; this.parentElement.querySelector('.placeholder-image').style.display='flex';"
+                <img
+                src="${firstProduct.images[0]}"
+                alt="${firstProduct.name}"
+                class="product-image"
+                data-group-name="${firstProduct.name}"
                 >
             `;
         }
@@ -1350,43 +1405,47 @@ function renderFavoritesModal() {
 }
 // Прямое добавление в корзину
 function addToCartDirectly(productId, quantity) {
-    const product = allProducts.find(p => p.id === productId);
-    if (!product) return;
-    const existingItem = cart.find(item => item.id === productId);
-    const isOutOfStock = quantity > product.stock;
-    // Проверяем, достаточно ли товара на складе
-    const actualStock = product.stock;
-    if (quantity > actualStock && actualStock > 0) {
-        showNotification(`На складе доступно только ${actualStock} шт. остальное будет под заказ`, 'warning', 3000);
-    } else if (quantity > actualStock && actualStock <= 0) {
-        showNotification(`Товар "${product.name}" будет заказан под заказ. Мы сообщим о сроках поставки.`, 'info', 3000);
-    }
-    if (existingItem) {
-        existingItem.quantity += quantity;
-        existingItem.isOutOfStock = isOutOfStock || existingItem.isOutOfStock;
-    } else {
-        cart.push({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            size: product.size,
-            quantity: quantity,
-            addedAt: new Date().toISOString(),
-            isOutOfStock: isOutOfStock
-        });
-    }
-    if (isOutOfStock && quantity > actualStock) {
-        showNotification(`Товар будет частично заказан под заказ. Мы сообщим о сроках поставки.`, 'info', 5000);
-    }
-    saveUserData('cart', cart);
-    renderCartModal();
-    updateCartCounter();
-    applyFilters(false); // Обновляем отображение
-    // Показываем уведомление
-    const sizeText = product.size ? `${product.size} мм` : '';
-    const quantityText = quantity > 1 ? `${quantity} шт.` : '1 шт.';
-    const statusText = isOutOfStock ? ' (под заказ)' : '';
-    showNotification(`Товар "${product.name}" ${sizeText} добавлен в корзину (${quantityText})${statusText}`);
+  const product = allProducts.find(p => p.id === productId);
+  if (!product) return;
+  
+  const existingItem = cart.find(item => item.id === productId);
+  const isOutOfStock = quantity > product.stock;
+  
+  // Проверяем остатки
+  const actualStock = product.stock;
+  if (quantity > actualStock && actualStock > 0) {
+    showNotification(`На складе доступно только ${actualStock} шт. остальное будет под заказ`, 'warning', 3000);
+  } else if (quantity > actualStock && actualStock <= 0) {
+    showNotification(`Товар "${product.name}" будет заказан под заказ. Мы сообщим о сроках поставки.`, 'info', 3000);
+  }
+  
+  // Обновляем или добавляем товар в корзину
+  if (existingItem) {
+    existingItem.quantity += quantity;
+    existingItem.isOutOfStock = isOutOfStock || existingItem.isOutOfStock;
+  } else {
+    cart.push({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      size: product.size,
+      quantity: quantity,
+      addedAt: new Date().toISOString(),
+      isOutOfStock: isOutOfStock
+    });
+  }
+  
+  // Сохраняем корзину
+  saveUserData('cart', cart);
+  renderCartModal();
+  updateCartCounter();
+  applyFilters(false);
+  
+  // Показываем уведомление
+  const sizeText = product.size ? `${product.size} мм` : '';
+  const quantityText = quantity > 1 ? `${quantity} шт.` : '1 шт.';
+  const statusText = isOutOfStock ? ' (под заказ)' : '';
+  showNotification(`Товар "${product.name}" ${sizeText} добавлен в корзину (${quantityText})${statusText}`);
 }
 // Функция входа партнера
 async function loginPartner(username, password) {
@@ -1423,15 +1482,25 @@ async function loginPartner(username, password) {
 }
 // Функция выхода партнера
 function logoutPartner() {
-    partner = null;
-    localStorage.removeItem('partner');
-    // Очищаем данные текущего пользователя
-    favorites = [];
-    cart = [];
-    // Инициализируем новое хранилище для анонимного пользователя
-    initUserStorage();
-    updateUIBasedOnAuth();
-    applyFilters();
+  if (!partner) return;
+  
+  // Сохраняем текущую корзину и избранное перед выходом
+  if (partner && partner.id) {
+    saveUserData('cart', cart);
+    saveUserData('favorites', favorites);
+    saveUserData('customerData', customerData);
+  }
+  
+  partner = null;
+  localStorage.removeItem('partner');
+  
+  // Инициализируем новое хранилище для анонимного пользователя
+  initUserStorage();
+  updateUIBasedOnAuth();
+  applyFilters();
+  
+  // Отображаем уведомление
+  showNotification('Вы успешно вышли из аккаунта. Ваши данные сохранены.', 'info', 2000);
 }
 // Функция обновления количества товара в корзине
 function updateCartItemQuantity(productId, quantity) {
@@ -1760,239 +1829,304 @@ function initEventListeners() {
 }
 // Показ формы оформления заказа
 function showOrderForm(isPartner) {
-    const orderModal = document.createElement('div');
-    orderModal.className = 'modal';
+  const orderModal = document.createElement('div');
+  orderModal.className = 'modal';
+  
+  // Инициализируем переменные для данных
+  let defaultCustomerName = '';
+  let defaultEmail = '';
+  let defaultPhone = '';
+  let defaultAddress = '';
+  
+  // Если есть партнер и его профиль загружен, используем его данные
+  if (isPartner && typeof partnerProfile !== 'undefined' && partnerProfile) {
+    defaultCustomerName = partnerProfile.contactPerson || partner.name || '';
+    defaultEmail = partnerProfile.email || '';
+    defaultPhone = partnerProfile.phone || '';
+  } else {
+    // Для обычных клиентов используем сохраненные данные
+    defaultCustomerName = customerData.customerName || '';
+    defaultEmail = customerData.email || '';
+    defaultPhone = customerData.phone || '';
+    defaultAddress = customerData.address || '';
+  }
+  
+  // Флаг для защиты от повторной отправки
+  let isSubmitting = false;
+  
+  // Создаем разную форму в зависимости от типа пользователя
+  let formHtml = `
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h2>${isPartner ? 'Оформление заказа для партнера' : 'Оформление заказа'}</h2>
+    <form id="order-form">
+      <div class="form-group">
+        <label for="customer-name">ФИО *</label>
+        <input type="text" id="customer-name" name="customer-name" value="${defaultCustomerName}" required>
+      </div>
+  `;
+  
+  if (isPartner) {
+    // Форма для партнера
+    formHtml += `
+    <div class="form-group">
+      <label for="email">Email для связи *</label>
+      <input type="email" id="email" name="email" value="${defaultEmail}" required>
+    </div>
+    <div class="form-group">
+      <label for="comments">Комментарии</label>
+      <textarea id="comments" name="comments"></textarea>
+    </div>
+    `;
+  } else {
+    // Форма для розничного покупателя
+    formHtml += `
+    <div class="form-group">
+      <label for="phone">Телефон *</label>
+      <input type="tel" id="phone" name="phone" value="${defaultPhone}" required>
+    </div>
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" value="${defaultEmail}">
+    </div>
+    <div class="form-group">
+      <label for="address">Адрес доставки *</label>
+      <textarea id="address" name="address" required>${defaultAddress}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="comments">Комментарии</label>
+      <textarea id="comments" name="comments"></textarea>
+    </div>
+    `;
+  }
+  
+  // Добавляем согласие на обработку данных
+  formHtml += `
+  <div class="form-group consent-group">
+    <label>
+      <input type="checkbox" id="consent-checkbox" required>
+      Я согласен на обработку моих персональных данных и использование cookie в соответствии с
+      <a href="/privacy-policy" target="_blank">Политикой конфиденциальности</a>
+    </label>
+  </div>
+  <div class="form-notice">
+    <p>Товары, которые отсутствуют на складе, будут заказаны под заказ. Мы сообщим вам о сроках поставки.</p>
+  </div>
+  <button type="submit" class="checkout-btn" id="submit-order-btn">Отправить заказ</button>
+  <button type="button" class="btn-secondary" id="cancel-order-btn" style="margin-left: 10px;">Отмена</button>
+  </form>
+  <div id="order-status" class="message hidden"></div>
+  </div>
+  `;
+  
+  orderModal.innerHTML = formHtml;
+  document.body.appendChild(orderModal);
+  
+  // Обработчики для модального окна заказа
+  const closeBtn = orderModal.querySelector('.close');
+  closeBtn.addEventListener('click', () => {
+    orderModal.remove();
+  });
+  
+  // Кнопка отмены
+  const cancelOrderBtn = document.getElementById('cancel-order-btn');
+  cancelOrderBtn.addEventListener('click', () => {
+    orderModal.remove();
+  });
+  
+  orderModal.addEventListener('click', (e) => {
+    if (e.target === orderModal) {
+      orderModal.remove();
+    }
+  });
+  
+  const orderForm = orderModal.querySelector('#order-form');
+  const submitBtn = document.getElementById('submit-order-btn');
+  
+  orderForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
     
-    // Инициализируем переменные для данных
-    let defaultCustomerName = '';
-    let defaultEmail = '';
-    let defaultPhone = '';
-    let defaultAddress = '';
-    
-    // Если есть партнер и его профиль загружен, используем его данные
-    if (isPartner && typeof partnerProfile !== 'undefined' && partnerProfile) {
-        defaultCustomerName = partnerProfile.contactPerson || partner.name || '';
-        defaultEmail = partnerProfile.email || '';
-        defaultPhone = partnerProfile.phone || '';
-    } else {
-        // Для обычных клиентов используем сохраненные данные
-        defaultCustomerName = customerData.customerName || '';
-        defaultEmail = customerData.email || '';
-        defaultPhone = customerData.phone || '';
-        defaultAddress = customerData.address || '';
+    // Проверяем флаг повторной отправки
+    if (isSubmitting) {
+      alert('Заказ уже обрабатывается. Пожалуйста, подождите.');
+      return;
     }
     
-    // Создаем разную форму в зависимости от типа пользователя
-    let formHtml = `
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2>${isPartner ? 'Оформление заказа для партнера' : 'Оформление заказа'}</h2>
-        <form id="order-form">
-            <div class="form-group">
-                <label for="customer-name">ФИО *</label>
-                <input type="text" id="customer-name" name="customer-name" value="${defaultCustomerName}" required>
-            </div>
-    `;
+    // Блокируем кнопку отправки
+    isSubmitting = true;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = 'Отправка...';
+    
+    // Проверяем согласие на обработку данных
+    const consentCheckbox = document.getElementById('consent-checkbox');
+    if (!consentCheckbox.checked) {
+      alert('Пожалуйста, согласитесь на обработку персональных данных');
+      isSubmitting = false;
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'Отправить заказ';
+      return;
+    }
+    
+    // Валидация полей
+    const customerName = document.getElementById('customer-name').value.trim();
+    if (!customerName) {
+      alert('Пожалуйста, укажите ФИО клиента');
+      isSubmitting = false;
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'Отправить заказ';
+      return;
+    }
+    
+    let phone = '';
+    let email = '';
+    let address = '';
     
     if (isPartner) {
-        // Форма для партнера: запрашиваем email вместо телефона
-        formHtml += `
-        <div class="form-group">
-            <label for="email">Email для связи *</label>
-            <input type="email" id="email" name="email" value="${defaultEmail}" required>
-        </div>
-        <div class="form-group">
-            <label for="comments">Комментарии</label>
-            <textarea id="comments" name="comments"></textarea>
-        </div>
-        `;
+      // Для партнера валидируем email
+      email = document.getElementById('email').value.trim();
+      if (!email) {
+        alert('Пожалуйста, укажите email для связи');
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Отправить заказ';
+        return;
+      }
+      if (!/\S+@\S+\.\S+/.test(email)) {
+        alert('Пожалуйста, введите корректный email');
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Отправить заказ';
+        return;
+      }
     } else {
-        // Форма для розничного покупателя
-        formHtml += `
-        <div class="form-group">
-            <label for="phone">Телефон *</label>
-            <input type="tel" id="phone" name="phone" value="${defaultPhone}" required>
-        </div>
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" value="${defaultEmail}">
-        </div>
-        <div class="form-group">
-            <label for="address">Адрес доставки *</label>
-            <textarea id="address" name="address" required>${defaultAddress}</textarea>
-        </div>
-        <div class="form-group">
-            <label for="comments">Комментарии</label>
-            <textarea id="comments" name="comments"></textarea>
-        </div>
-        `;
+      // Для обычных клиентов валидируем телефон и адрес
+      phone = document.getElementById('phone').value.trim();
+      if (!phone) {
+        alert('Пожалуйста, укажите телефон');
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Отправить заказ';
+        return;
+      }
+      email = document.getElementById('email').value.trim();
+      address = document.getElementById('address').value.trim();
+      if (!address) {
+        alert('Пожалуйста, укажите адрес доставки');
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Отправить заказ';
+        return;
+      }
     }
     
-    // Добавляем согласие на обработку данных
-    formHtml += `
-    <div class="form-group consent-group">
-        <label>
-            <input type="checkbox" id="consent-checkbox" required>
-            Я согласен на обработку моих персональных данных и использование cookie в соответствии с 
-            <a href="/privacy-policy" target="_blank">Политикой конфиденциальности</a>
-        </label>
-    </div>
-    <div class="form-notice">
-        <p>Товары, которые отсутствуют на складе, будут заказаны под заказ. Мы сообщим вам о сроках поставки.</p>
-    </div>
-    <button type="submit" class="checkout-btn">Отправить заказ</button>
-    </form>
-    <div id="order-status" class="message hidden"></div>
-    </div>
-    `;
+    // Собираем данные формы
+    const formData = {
+      customerName: customerName,
+      phone: isPartner ? (defaultPhone || '') : phone,
+      email: email,
+      address: isPartner ? 'Не требуется' : address,
+      comments: document.getElementById('comments').value.trim(),
+      items: cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        size: item.size,
+        price: item.price,
+        quantity: item.quantity,
+        itemNumber: allProducts.find(p => p.id === item.id)?.item || '',
+        isOutOfStock: item.quantity > (allProducts.find(p => p.id === item.id)?.stock || 0)
+      })),
+      total: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      isPartner: isPartner,
+      partnerId: isPartner ? partner.id : null,
+      status: 'new'
+    };
     
-    orderModal.innerHTML = formHtml;
-    document.body.appendChild(orderModal);
-    
-    // Обработчики для модального окна заказа
-    const closeBtn = orderModal.querySelector('.close');
-    closeBtn.addEventListener('click', () => {
-        orderModal.remove();
-    });
-    
-    orderModal.addEventListener('click', (e) => {
-        if (e.target === orderModal) {
-            orderModal.remove();
-        }
-    });
-    
-    const orderForm = orderModal.querySelector('#order-form');
-    orderForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+      
+      const statusEl = document.getElementById('order-status');
+      
+      if (response.ok) {
+        const data = await response.json();
         
-        // Проверяем согласие на обработку данных
-        const consentCheckbox = document.getElementById('consent-checkbox');
-        if (!consentCheckbox.checked) {
-            alert('Пожалуйста, согласитесь на обработку персональных данных');
-            return;
-        }
-        
-        // Валидация полей
-        const customerName = document.getElementById('customer-name').value.trim();
-        if (!customerName) {
-            alert('Пожалуйста, укажите ФИО клиента');
-            return;
-        }
-        
-        let phone = '';
-        let email = '';
-        let address = '';
-        
-        if (isPartner) {
-            // Для партнера валидируем email
-            email = document.getElementById('email').value.trim();
-            if (!email) {
-                alert('Пожалуйста, укажите email для связи');
-                return;
-            }
-            if (!/\S+@\S+\.\S+/.test(email)) {
-                alert('Пожалуйста, введите корректный email');
-                return;
-            }
-        } else {
-            // Для обычных клиентов валидируем телефон и адрес
-            phone = document.getElementById('phone').value.trim();
-            if (!phone) {
-                alert('Пожалуйста, укажите телефон');
-                return;
-            }
-            email = document.getElementById('email').value.trim();
-            address = document.getElementById('address').value.trim();
-            if (!address) {
-                alert('Пожалуйста, укажите адрес доставки');
-                return;
-            }
-        }
-        
-        // Собираем данные формы
-        const formData = {
+        // Сохраняем контактные данные для розничных покупателей
+        if (!isPartner) {
+          customerData = {
             customerName: customerName,
-            // Для партнера телефон не обязателен, поэтому оставляем пустым или используем значение из профиля
-            phone: isPartner ? (defaultPhone || '') : phone,
+            phone: phone,
             email: email,
-            // Для партнера адрес не обязателен
-            address: isPartner ? 'Не требуется' : address,
-            comments: document.getElementById('comments').value.trim(),
-            items: cart.map(item => ({
-                id: item.id,
-                name: item.name,
-                size: item.size,
-                price: item.price,
-                quantity: item.quantity,
-                itemNumber: allProducts.find(p => p.id === item.id)?.item || '',
-                isOutOfStock: item.quantity > (allProducts.find(p => p.id === item.id)?.stock || 0)
-            })),
-            total: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
-            isPartner: isPartner,
-            partnerId: isPartner ? partner.id : null,
-            status: 'new' // Новый заказ
-        };
-        
-        try {
-            const response = await fetch('/api/orders', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-            
-            const statusEl = document.getElementById('order-status');
-            if (response.ok) {
-                const data = await response.json();
-                
-                // Сохраняем контактные данные для розничных покупателей
-                if (!isPartner) {
-                    customerData = {
-                        customerName: customerName,
-                        phone: phone,
-                        email: email,
-                        address: address
-                    };
-                    saveUserData('customerData', customerData);
-                }
-                
-                statusEl.textContent = isPartner ?
-                    `✅ Заказ успешно оформлен! Номер заказа: ${data.orderId}. Наш менеджер свяжется с вами по email для подтверждения заказа.` :
-                    `✅ Заказ успешно оформлен! Номер заказа: ${data.orderId}. Ожидайте звонка менеджера для подтверждения реквизитов и оплаты.`;
-                statusEl.className = 'message success';
-                statusEl.classList.remove('hidden');
-                
-                // Очищаем корзину
-                cart = [];
-                saveUserData('cart', cart);
-                updateCartCounter();
-                applyFilters();
-                
-                // Закрываем модальное окно корзины
-                if (cartModal) cartModal.classList.add('hidden');
-                
-                // Обновляем заказы партнера, если таковой имеется
-                if (partner && typeof window.refreshPartnerOrders === 'function') {
-                    window.refreshPartnerOrders();
-                }
-                
-                // Закрываем форму заказа через 3 секунды
-                setTimeout(() => {
-                    orderModal.remove();
-                }, 3000);
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Ошибка оформления заказа: ' + response.status);
-            }
-        } catch (error) {
-            console.error('Ошибка оформления заказа:', error);
-            const statusEl = document.getElementById('order-status');
-            statusEl.textContent = `❌ ${error.message || 'Неизвестная ошибка'}. Попробуйте позже.`;
-            statusEl.className = 'message error';
-            statusEl.classList.remove('hidden');
+            address: address
+          };
+          saveUserData('customerData', customerData);
         }
-    });
+        
+        statusEl.textContent = isPartner ?
+          `✅ Заказ успешно оформлен! Номер заказа: ${data.orderId}. Наш менеджер свяжется с вами по email для подтверждения заказа.` :
+          `✅ Заказ успешно оформлен! Номер заказа: ${data.orderId}. Ожидайте звонка менеджера для подтверждения реквизитов и оплаты.`;
+        
+        statusEl.className = 'message success';
+        statusEl.classList.remove('hidden');
+        
+        // Очищаем корзину только после успешного оформления заказа
+        const previousCart = [...cart]; // Сохраняем копию для возможного восстановления
+        cart = [];
+        saveUserData('cart', cart);
+        updateCartCounter();
+        applyFilters();
+        
+        // Закрываем модальное окно корзины
+        if (cartModal) cartModal.classList.add('hidden');
+        
+        // Обновляем заказы партнера, если таковой имеется
+        if (partner && typeof window.refreshPartnerOrders === 'function') {
+          window.refreshPartnerOrders();
+        }
+        
+        // Закрываем форму заказа через 3 секунды
+        setTimeout(() => {
+          orderModal.remove();
+        }, 3000);
+        
+        // Разблокируем кнопку отправки
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Отправить заказ';
+        
+        // Показываем уведомление
+        showNotification(`Заказ #${data.orderId} успешно оформлен!`, 'success', 5000);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка оформления заказа: ' + response.status);
+      }
+    } catch (error) {
+      console.error('Ошибка оформления заказа:', error);
+      
+      // Восстанавливаем корзину при ошибке
+      if (cart.length === 0 && previousCart) {
+        cart = previousCart;
+        saveUserData('cart', cart);
+        updateCartCounter();
+        applyFilters();
+        showNotification('Корзина восстановлена после ошибки отправки заказа', 'info', 3000);
+      }
+      
+      const statusEl = document.getElementById('order-status');
+      statusEl.textContent = `❌ ${error.message || 'Неизвестная ошибка'}. Попробуйте позже. Если проблема сохранится, обратитесь в поддержку.`;
+      statusEl.className = 'message error';
+      statusEl.classList.remove('hidden');
+      
+      // Разблокируем кнопку отправки
+      isSubmitting = false;
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'Отправить заказ';
+    }
+  });
 }
 // Установка режима отображения
 function setViewMode(mode) {

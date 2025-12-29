@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход в админку ДВЕРИ МАСТАК</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f7ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .login-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      padding: 40px;
+      width: 100%;
+      max-width: 450px;
+      text-align: center;
+    }
+    .logo {
+      font-size: 28px;
+      margin-bottom: 30px;
+      color: #4361ee;
+      font-weight: bold;
+    }
+    .form-group {
+      margin-bottom: 25px;
+      text-align: left;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #333;
+    }
+    input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #4361ee;
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+    }
+    .btn {
+      background: #4361ee;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s;
+      width: 100%;
+    }
+    .btn:hover {
+      background: #3a56e0;
+    }
+    .btn:disabled {
+      background: #a0aec0;
+      cursor: not-allowed;
+    }
+    .step {
+      margin: 15px 0;
+      font-size: 14px;
+      color: #666;
+      text-align: left;
+      padding-left: 10px;
+    }
+    .message {
+      padding: 12px;
+      border-radius: 6px;
+      margin: 15px 0;
+      display: none;
+    }
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      display: block;
+    }
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4361ee;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+      display: none;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="logo">🚪 ДВЕРИ МАСТАК</div>
+    <h2>Административная панель</h2>
+    
+    <div id="usernameStep">
+      <div class="form-group">
+        <label for="username">Логин:</label>
+        <input type="text" id="username" name="username" placeholder="Введите ваш логин" required>
+      </div>
+      <button class="btn" id="requestCodeBtn">Отправить код в Telegram</button>
+      <p class="step">Шаг 1: Введите логин и получите код для входа в Telegram</p>
+    </div>
+    
+    <div id="codeStep" style="display: none;">
+      <div class="form-group">
+        <label for="loginCode">Код из Telegram:</label>
+        <input type="text" id="loginCode" name="loginCode" placeholder="Введите 6-значный код" maxlength="6" required>
+      </div>
+      <button class="btn" id="verifyCodeBtn">Войти в систему</button>
+      <p class="step">Шаг 2: Введите код, полученный в Telegram</p>
+      <button class="btn" style="background: #6c757d; margin-top: 10px;" id="backBtn">Назад</button>
+    </div>
+    
+    <div class="loader" id="loader"></div>
+    <div class="message" id="message"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const usernameStep = document.getElementById('usernameStep');
+      const codeStep = document.getElementById('codeStep');
+      const requestCodeBtn = document.getElementById('requestCodeBtn');
+      const verifyCodeBtn = document.getElementById('verifyCodeBtn');
+      const backBtn = document.getElementById('backBtn');
+      const usernameInput = document.getElementById('username');
+      const codeInput = document.getElementById('loginCode');
+      const messageEl = document.getElementById('message');
+      const loader = document.getElementById('loader');
+      
+      let currentUsername = '';
+      
+      requestCodeBtn.addEventListener('click', async () => {
+        const username = usernameInput.value.trim();
+        if (!username) {
+          showMessage('Пожалуйста, введите логин', 'error');
+          return;
+        }
+        
+        showLoader(true);
+        try {
+          const response = await fetch('/admin/request-login-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok) {
+            currentUsername = username;
+            showMessage(result.message, 'success');
+            // Переходим к следующему шагу
+            usernameStep.style.display = 'none';
+            codeStep.style.display = 'block';
+          } else {
+            showMessage(result.error || 'Ошибка при запросе кода', 'error');
+          }
+        } catch (error) {
+          showMessage('Ошибка сети: ' + error.message, 'error');
+        } finally {
+          showLoader(false);
+        }
+      });
+      
+      verifyCodeBtn.addEventListener('click', async () => {
+        const code = codeInput.value.trim();
+        if (code.length !== 6 || !/^\d+$/.test(code)) {
+          showMessage('Код должен быть 6-значным числом', 'error');
+          return;
+        }
+        
+        showLoader(true);
+        try {
+          const response = await fetch('/admin/verify-login-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUsername, code })
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok) {
+            window.location.href = '/admin';
+          } else {
+            showMessage(result.error || 'Ошибка аутентификации', 'error');
+          }
+        } catch (error) {
+          showMessage('Ошибка сети: ' + error.message, 'error');
+        } finally {
+          showLoader(false);
+        }
+      });
+      
+      backBtn.addEventListener('click', () => {
+        codeStep.style.display = 'none';
+        usernameStep.style.display = 'block';
+        codeInput.value = '';
+        messageEl.style.display = 'none';
+      });
+      
+      codeInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+      });
+      
+      function showMessage(text, type) {
+        messageEl.textContent = text;
+        messageEl.className = 'message ' + type;
+        messageEl.style.display = 'block';
+      }
+      
+      function showLoader(show) {
+        loader.style.display = show ? 'block' : 'none';
+        requestCodeBtn.disabled = show;
+        verifyCodeBtn.disabled = show;
+      }
+    });
+  </script>
+</body>
+</html>

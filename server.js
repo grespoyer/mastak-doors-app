@@ -1,6 +1,7 @@
 require('dotenv').config(); // Загрузка переменных из .env файла
 const axios = require('axios');
-
+const bcrypt = require('bcrypt');
+const saltRounds = 12;
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
@@ -10,9 +11,14 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 const crypto = require('crypto');
+const cookieParser = require('cookie-parser');
+const session = require('express-session');
 const app = express();
-const PORT = process.env.PORT;
-// Настройки (без изменений)
+const loginCodes = new Map();
+app.use(cookieParser());
+
+// Настройки
+const PORT = process.env.PORT || 3000;
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const ADMIN_DIR = path.join(__dirname, 'admin');
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -24,6 +30,7 @@ const INPUT_DIR = path.join(__dirname, 'input');
 const PARTNERS_FILE = path.join(__dirname, 'partners.json');
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 const TEMP_PRODUCTS_FILE = path.join(__dirname, 'temp.json');
+
 // Создаем папки
 [UPLOADS_DIR, ADMIN_DIR, PUBLIC_DIR, INPUT_DIR].forEach(dir => {
     if (!fse.existsSync(dir)) {
@@ -31,60 +38,407 @@ const TEMP_PRODUCTS_FILE = path.join(__dirname, 'temp.json');
         console.log(`📁 Создана папка: ${dir}`);
     }
 });
+
+// Настройка сессий ДО любых роутов
+app.use(session({
+    secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 часа
+    }
+}));
+
+// Middleware защиты админки (должно идти ПОСЛЕ настройки сессий, но ДО статических файлов и роутов)
+const requireAdminAuth = (req, res, next) => {
+    const publicAdminPaths = [
+        '/admin/login',
+        '/admin/request-login-code',
+        '/admin/verify-login-code'
+    ];
+    
+    // Если путь публичный для админки - пропускаем
+    if (publicAdminPaths.includes(req.path)) {
+        return next();
+    }
+    
+    // Если пользователь пытается получить доступ к админке и не аутентифицирован
+    if (req.path.startsWith('/admin') && !req.session.isAdminAuthenticated) {
+        if (req.xhr || req.headers.accept?.includes('json')) {
+            return res.status(401).json({ error: 'Требуется аутентификация' });
+        }
+        return res.redirect('/admin/login');
+    }
+    
+    next();
+};
+
+// Применяем middleware защиты СРАЗУ после настройки сессий
+app.use(requireAdminAuth);
+
+// Статические файлы (после middleware защиты)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.static(PUBLIC_DIR));
+app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/admin', express.static(ADMIN_DIR));
+
+// Middleware для CSP (Content Security Policy)
+app.use((req, res, next) => {
+    const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https:; connect-src 'self' https:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'";
+    res.setHeader('Content-Security-Policy', csp);
+    next();
+});
+
 // Создаем файл партнеров, если его нет
 if (!fse.existsSync(PARTNERS_FILE)) {
+  console.log('📁 Файл партнеров не найден, создаем новый...');
+  
+  try {
     const initialPartners = [
-        {
-            id: '1',
-            username: 'partner1',
-            password: hashPassword('password1'), // Хеширование пароля
-            name: 'Партнер №1',
-            contactPerson: 'Иван Иванов',
-            email: 'partner1@example.com',
-            phone: '+7 (999) 123-45-67',
-            createdAt: new Date().toISOString()
-        }
+      {
+        id: '1',
+        username: 'partner1',
+        password: hashPassword('password1'), // Хеширование пароля
+        name: 'Партнер №1',
+        contactPerson: 'Иван Иванов',
+        email: 'partner1@example.com',
+        phone: '+7 (999) 123-45-67',
+        createdAt: new Date().toISOString()
+      }
     ];
+    
     fse.writeFileSync(PARTNERS_FILE, JSON.stringify(initialPartners, null, 2));
-    console.log(`📁 Создан файл партнеров с тестовыми данными: ${PARTNERS_FILE}`);
+    console.log(`✅ Файл партнеров создан с тестовыми данными: ${PARTNERS_FILE}`);
+    console.log('Тестовый партнер: логин "partner1", пароль "password1"');
+  } catch (error) {
+    console.error('❌ Ошибка создания файла партнеров:', error);
+  }
+} else {
+  console.log(`✅ Файл партнеров уже существует: ${PARTNERS_FILE}`);
+  
+  // Проверяем и восстанавливаем содержимое файла при необходимости
+  try {
+    const data = fse.readFileSync(PARTNERS_FILE, 'utf8');
+    const partners = JSON.parse(data);
+    console.log(`📁 В файле партнеров ${partners.length} записей`);
+    
+    // Проверяем целостность данных
+    let needsFix = false;
+    partners.forEach(partner => {
+      if (!partner.password || partner.password.length < 10) { // Хеш обычно длиннее 10 символов
+        console.warn(`⚠️ Партнер ${partner.username} имеет некорректный пароль, исправляем...`);
+        partner.password = hashPassword('password1'); // Новый пароль по умолчанию
+        needsFix = true;
+      }
+      
+      // Убеждаемся, что есть все необходимые поля
+      if (!partner.createdAt) {
+        partner.createdAt = new Date().toISOString();
+        needsFix = true;
+      }
+    });
+    
+    if (needsFix) {
+      fse.writeFileSync(PARTNERS_FILE, JSON.stringify(partners, null, 2));
+      console.log('✅ Файл партнеров исправлен и сохранен');
+    }
+  } catch (e) {
+    console.error('❌ Ошибка чтения файла партнеров:', e);
+    console.log('Попытка восстановления файла...');
+    
+    try {
+      // Создаем новый файл с тестовыми данными
+      const initialPartners = [
+        {
+          id: '1',
+          username: 'partner1',
+          password: hashPassword('password1'),
+          name: 'Партнер №1',
+          contactPerson: 'Иван Иванов',
+          email: 'partner1@example.com',
+          phone: '+7 (999) 123-45-67',
+          createdAt: new Date().toISOString()
+        }
+      ];
+      
+      fse.writeFileSync(PARTNERS_FILE, JSON.stringify(initialPartners, null, 2));
+      console.log('✅ Файл партнеров восстановлен с тестовыми данными');
+    } catch (recoveryError) {
+      console.error('❌ Критическая ошибка восстановления файла партнеров:', recoveryError);
+    }
+  }
 }
+
 // Создаем файл заказов, если его нет
 if (!fse.existsSync(ORDERS_FILE)) {
     fse.writeFileSync(ORDERS_FILE, '[]');
     console.log(`📁 Создан файл для хранения заказов: ${ORDERS_FILE}`);
 }
+
 // Создаем файл для временных данных, если его нет
 if (!fse.existsSync(TEMP_PRODUCTS_FILE)) {
     fse.writeFileSync(TEMP_PRODUCTS_FILE, '[]');
     console.log(`📁 Создан файл для временных данных: ${TEMP_PRODUCTS_FILE}`);
 }
 
-// Функция отправки сообщения в Telegram
-async function sendTelegramMessage(botToken, chatId, message, parseMode = 'Markdown') {
-  if (!botToken || !chatId) {
-    console.warn('⚠️ Не установлены параметры для Telegram бота');
-    return null;
-  }
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-  const data = {
-    chat_id: chatId,
-    text: message,
-    parse_mode: parseMode
-  };
+// API: Получить список партнеров
+app.get('/api/partners', async (req, res) => {
   try {
-    const response = await axios.post(url, data);
-    console.log(`✅ Сообщение успешно отправлено в Telegram: ${response.data?.ok ? 'OK' : 'Ошибка'}`);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Ошибка отправки сообщения в Telegram:', error.response?.data || error.message);
-    return null;
+    const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+    const partners = JSON.parse(data);
+    // Возвращаем партнеров без паролей
+    const partnersWithoutPasswords = partners.map(({ password, ...partner }) => partner);
+    res.json(partnersWithoutPasswords);
+  } catch (err) {
+    console.error('Ошибка получения списка партнеров:', err);
+    res.status(500).json({ error: 'Ошибка получения списка партнеров' });
   }
-}
+});
+// API: Получить данные партнера по ID
+app.get('/api/partners/:id', async (req, res) => {
+  try {
+    const partnerId = req.params.id;
+    const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+    const partners = JSON.parse(data);
+    const partner = partners.find(p => p.id === partnerId);
+    
+    if (!partner) {
+      return res.status(404).json({ error: 'Партнер не найден' });
+    }
+    
+    // Возвращаем партнера без пароля
+    const { password, ...partnerWithoutPassword } = partner;
+    res.json(partnerWithoutPassword);
+  } catch (err) {
+    console.error('Ошибка получения данных партнера:', err);
+    res.status(500).json({ error: 'Ошибка получения данных партнера' });
+  }
+});
+// API: Создать нового партнера
+app.post('/api/partners', async (req, res) => {
+  try {
+    const { username, password, name, contactPerson, email, phone } = req.body;
+    
+    // Валидация обязательных полей
+    if (!username || !password || !name) {
+      return res.status(400).json({ error: 'Логин, пароль и название партнера обязательны' });
+    }
+    
+    // Проверка уникальности логина
+    let partners = [];
+    try {
+      const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+      partners = JSON.parse(data);
+    } catch (e) {
+      // Файл не существует, создадим его
+    }
+    
+    if (partners.some(p => p.username === username)) {
+      return res.status(400).json({ error: 'Партнер с таким логином уже существует' });
+    }
+    
+    // Хеширование пароля
+    const hashedPassword = hashPassword(password);
+    
+    // Создание нового партнера
+    const newPartner = {
+      id: Date.now().toString(),
+      username,
+      password: hashedPassword,
+      name,
+      contactPerson: contactPerson || '',
+      email: email || '',
+      phone: phone || '',
+      createdAt: new Date().toISOString()
+    };
+    
+    partners.push(newPartner);
+    await fs.writeFile(PARTNERS_FILE, JSON.stringify(partners, null, 2));
+    
+    // Возвращаем партнера без пароля
+    const { password: _, ...partnerWithoutPassword } = newPartner;
+    res.status(201).json(partnerWithoutPassword);
+  } catch (err) {
+    console.error('Ошибка создания партнера:', err);
+    res.status(500).json({ error: 'Ошибка создания партнера' });
+  }
+});
+
+// API: Обновить данные партнера
+app.put('/api/partners/:id', async (req, res) => {
+  try {
+    const partnerId = req.params.id;
+    const { username, name, contactPerson, email, phone, newPassword } = req.body;
+    
+    // Валидация обязательных полей
+    if (!username || !name) {
+      return res.status(400).json({ error: 'Логин и название партнера обязательны' });
+    }
+    
+    // Загрузка партнеров
+    const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+    let partners = JSON.parse(data);
+    
+    const partnerIndex = partners.findIndex(p => p.id === partnerId);
+    if (partnerIndex === -1) {
+      return res.status(404).json({ error: 'Партнер не найден' });
+    }
+    
+    // Проверка уникальности логина
+    if (partners.some(p => p.username === username && p.id !== partnerId)) {
+      return res.status(400).json({ error: 'Партнер с таким логином уже существует' });
+    }
+    
+    // Обновление данных партнера
+    const updatedPartner = {
+      ...partners[partnerIndex],
+      username,
+      name,
+      contactPerson: contactPerson || '',
+      email: email || '',
+      phone: phone || ''
+    };
+    
+    // Если указан новый пароль, хешируем его
+    if (newPassword && newPassword.trim() !== '') {
+      updatedPartner.password = hashPassword(newPassword.trim());
+    }
+    
+    partners[partnerIndex] = updatedPartner;
+    await fs.writeFile(PARTNERS_FILE, JSON.stringify(partners, null, 2));
+    
+    // Возвращаем партнера без пароля
+    const { password: _, ...partnerWithoutPassword } = updatedPartner;
+    res.json(partnerWithoutPassword);
+  } catch (err) {
+    console.error('Ошибка обновления партнера:', err);
+    res.status(500).json({ error: 'Ошибка обновления партнера' });
+  }
+});
+
+// API: Удалить партнера
+app.delete('/api/partners/:id', async (req, res) => {
+  try {
+    const partnerId = req.params.id;
+    
+    const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+    let partners = JSON.parse(data);
+    
+    const originalLength = partners.length;
+    partners = partners.filter(p => p.id !== partnerId);
+    
+    if (partners.length === originalLength) {
+      return res.status(404).json({ error: 'Партнер не найден' });
+    }
+    
+    await fs.writeFile(PARTNERS_FILE, JSON.stringify(partners, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Ошибка удаления партнера:', err);
+    res.status(500).json({ error: 'Ошибка удаления партнера' });
+  }
+});
+
+// API: Сгенерировать и отправить новый пароль партнера
+app.post('/api/partners/:id/reset-password', async (req, res) => {
+  try {
+    const partnerId = req.params.id;
+    
+    const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+    let partners = JSON.parse(data);
+    
+    const partnerIndex = partners.findIndex(p => p.id === partnerId);
+    if (partnerIndex === -1) {
+      return res.status(404).json({ error: 'Партнер не найден' });
+    }
+    
+    // Генерация нового пароля
+    const newPassword = Math.random().toString(36).slice(-8);
+    partners[partnerIndex].password = hashPassword(newPassword);
+    
+    await fs.writeFile(PARTNERS_FILE, JSON.stringify(partners, null, 2));
+    
+    // Отправка нового пароля администратору
+    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
+      try {
+        const partner = partners[partnerIndex];
+        const message = `
+🔐 *Сброс пароля партнера*
+👤 *Партнер:* ${partner.name}
+🆔 *ID:* ${partner.id}
+🔑 *Новый пароль:* ${newPassword}
+❗ *Важно:* Передайте пароль партнеру и попросите сменить его после первого входа
+`;
+        await sendTelegramMessage(
+          process.env.TELEGRAM_BOT_TOKEN,
+          process.env.TELEGRAM_ADMIN_CHAT_ID,
+          message,
+          'Markdown'
+        );
+      } catch (telegramError) {
+        console.error('Ошибка отправки пароля в Telegram:', telegramError);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Пароль сброшен и отправлен администратору через Telegram' 
+    });
+  } catch (err) {
+    console.error('Ошибка сброса пароля партнера:', err);
+    res.status(500).json({ error: 'Ошибка сброса пароля партнера' });
+  }
+});
 
 // Функция хеширования паролей
 function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
+  try {
+    return bcrypt.hashSync(password, saltRounds);
+  } catch (error) {
+    console.error('❌ Ошибка хеширования пароля:', error);
+    throw new Error('Ошибка хеширования пароля');
+  }
 }
+
+function verifyPassword(password, hash) {
+  try {
+    return bcrypt.compareSync(password, hash);
+  } catch (error) {
+    console.error('❌ Ошибка проверки пароля:', error);
+    return false;
+  }
+}
+
+// Генерация 6-значного кода
+function generateLoginCode() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Функция отправки сообщения в Telegram
+async function sendTelegramMessage(botToken, chatId, message, parseMode = 'Markdown') {
+    if (!botToken || !chatId) {
+        console.warn('⚠️ Не установлены параметры для Telegram бота');
+        return null;
+    }
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const data = {
+        chat_id: chatId,
+        text: message,
+        parse_mode: parseMode
+    };
+    try {
+        const response = await axios.post(url, data);
+        console.log(`✅ Сообщение успешно отправлено в Telegram: ${response.data?.ok ? 'OK' : 'Ошибка'}`);
+        return response.data;
+    } catch (error) {
+        console.error('❌ Ошибка отправки сообщения в Telegram:', error.response?.data || error.message);
+        return null;
+    }
+}
+
 // Настройка загрузки изображений
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, UPLOADS_DIR),
@@ -104,12 +458,7 @@ const upload = multer({
         cb(new Error('Только изображения (JPEG, PNG, WebP)'));
     }
 });
-// Middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(PUBLIC_DIR));
-app.use('/admin', express.static(ADMIN_DIR));
-app.use('/uploads', express.static(UPLOADS_DIR));
+
 // === API: Получить все товары ===
 app.get('/api/products', async (req, res) => {
     try {
@@ -123,6 +472,7 @@ app.get('/api/products', async (req, res) => {
         res.status(500).json({ error: 'Ошибка чтения данных' });
     }
 });
+
 // === API: Получить товар по ID ===
 app.get('/api/products/:id', async (req, res) => {
     const productId = req.params.id;
@@ -136,6 +486,7 @@ app.get('/api/products/:id', async (req, res) => {
         res.status(500).json({ error: 'Ошибка обработки данных' });
     }
 });
+
 // === API: Добавить/обновить товар ===
 app.post('/api/products', upload.array('images', 5), async (req, res) => {
     const {
@@ -206,6 +557,7 @@ app.post('/api/products', upload.array('images', 5), async (req, res) => {
         res.status(500).json({ error: 'Ошибка сохранения данных' });
     }
 });
+
 // === API: Удалить товар ===
 app.delete('/api/products/:id', async (req, res) => {
     const productId = req.params.id;
@@ -226,6 +578,7 @@ app.delete('/api/products/:id', async (req, res) => {
         res.status(500).json({ error: 'Ошибка сохранения данных' });
     }
 });
+
 // === API: Массовое обновление товаров ===
 app.patch('/api/bulk-update', async (req, res) => {
     const { ids, updates } = req.body;
@@ -271,6 +624,7 @@ app.patch('/api/bulk-update', async (req, res) => {
         res.status(500).json({ error: 'Ошибка при массовом обновлении' });
     }
 });
+
 // Функция применения временных данных к обновленным остаткам
 async function applyTempProductsToUpdatedStocks() {
     console.log('🔄 Обновление данных: временно вычтенные остатки будут сброшены, так как новые данные актуальны');
@@ -280,7 +634,6 @@ async function applyTempProductsToUpdatedStocks() {
         try {
             const tempData = await fs.readFile(TEMP_PRODUCTS_FILE, 'utf8');
             tempProducts = JSON.parse(tempData);
-            
             if (tempProducts.length > 0) {
                 console.log(`ℹ️ Обнаружены временные данные, которые будут сброшены (${tempProducts.length} записей):`);
                 // Логируем информацию о том, какие товары были в обработке
@@ -292,7 +645,6 @@ async function applyTempProductsToUpdatedStocks() {
                     summary[temp.name].count++;
                     summary[temp.name].totalQuantity += temp.orderedQuantity;
                 });
-                
                 Object.entries(summary).forEach(([name, data]) => {
                     console.log(`  - ${name}: ${data.count} заказов, всего ${data.totalQuantity} шт.`);
                 });
@@ -300,18 +652,15 @@ async function applyTempProductsToUpdatedStocks() {
         } catch (e) {
             console.log('ℹ️ Нет временных данных для сброса');
         }
-        
         // 🔥 ПОЛНОСТЬЮ ОЧИЩАЕМ временные данные без применения к остаткам
         // Так как при обновлении из Excel новые остатки уже отражают актуальное состояние склада
         await fs.writeFile(TEMP_PRODUCTS_FILE, '[]', 'utf8');
         console.log('✅ Все временные данные успешно сброшены. Новые остатки из Excel считаются актуальными.');
-        
         // Дополнительно: очищаем статусы заказов "В обработке", чтобы они вернулись в статус "Новые"
         try {
             const ordersData = await fs.readFile(ORDERS_FILE, 'utf8');
             let orders = JSON.parse(ordersData);
             let processingOrdersChanged = false;
-            
             orders = orders.map(order => {
                 if (order.status === 'processing') {
                     console.log(`🔄 Заказ #${order.id} переведен из статуса "В обработке" в "Новый" из-за обновления данных`);
@@ -320,7 +669,6 @@ async function applyTempProductsToUpdatedStocks() {
                 }
                 return order;
             });
-            
             if (processingOrdersChanged) {
                 await fs.writeFile(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
                 console.log('✅ Статусы заказов обновлены: все заказы в статусе "В обработке" переведены в "Новые"');
@@ -328,7 +676,6 @@ async function applyTempProductsToUpdatedStocks() {
         } catch (e) {
             console.error('⚠️ Не удалось обновить статусы заказов:', e);
         }
-        
     } catch (error) {
         console.error('❌ Ошибка при сбросе временных данных:', error);
         throw error;
@@ -342,8 +689,8 @@ app.get('/api/check-update', async (req, res) => {
         // Получаем список файлов в папке input
         const files = await fs.readdir(INPUT_DIR);
         // Ищем Excel файл с остатками Альбере
-        const excelFiles = files.filter(file => 
-            file.toLowerCase().includes('альберо') && 
+        const excelFiles = files.filter(file =>
+            file.toLowerCase().includes('альберо') &&
             file.toLowerCase().includes('остатки') &&
             (file.toLowerCase().endsWith('.xls') || file.toLowerCase().endsWith('.xlsx'))
         ).sort((a, b) => {
@@ -404,10 +751,8 @@ app.get('/api/check-update', async (req, res) => {
             console.error('❌ Ошибка при запуске sync-products.js:', syncError.stderr || syncError.message);
             throw new Error('Ошибка при синхронизации данных sync-products.js');
         }
-        
         // Применяем временные данные к новым остаткам
         await applyTempProductsToUpdatedStocks();
-        
         // Сохраняем информацию об обновлении
         await fs.writeFile(LAST_UPDATE_FILE, JSON.stringify({
             date: fileDate,
@@ -450,6 +795,7 @@ app.get('/api/check-update', async (req, res) => {
         });
     }
 });
+
 // === API: Получить дату последнего обновления ===
 app.get('/api/last-update', async (req, res) => {
     try {
@@ -461,6 +807,7 @@ app.get('/api/last-update', async (req, res) => {
         res.json({ date: '5.12.2025' }); // Дата по умолчанию
     }
 });
+
 // === API: Получить видимые категории ===
 app.get('/api/visible-categories', async (req, res) => {
     try {
@@ -474,6 +821,7 @@ app.get('/api/visible-categories', async (req, res) => {
         res.status(500).json({ error: 'Ошибка чтения данных о видимых категориях' });
     }
 });
+
 // === API: Обновить видимые категории ===
 app.post('/api/visible-categories', async (req, res) => {
     const { categories } = req.body;
@@ -488,65 +836,61 @@ app.post('/api/visible-categories', async (req, res) => {
         res.status(500).json({ error: 'Ошибка сохранения данных' });
     }
 });
+
 // === API: Обратная связь ===
 app.post('/api/feedback', async (req, res) => {
-  try {
-    const { message, email } = req.body;
-    if (!message || message.trim().length < 5) {
-      return res.status(400).json({ error: 'Сообщение должно содержать минимум 5 символов' });
-    }
-    let feedbackList = [];
     try {
-      const data = await fs.readFile(FEEDBACK_FILE, 'utf8');
-      feedbackList = JSON.parse(data);
-    } catch (e) {
-      // Игнорируем ошибку - файла не существует
-    }
-    const newFeedback = {
-      id: Date.now().toString(),
-      message: message.trim(),
-      email: email ? email.trim() : null,
-      date: new Date().toISOString()
-    };
-    feedbackList.push(newFeedback);
-    await fs.writeFile(FEEDBACK_FILE, JSON.stringify(feedbackList, null, 2), 'utf8');
-    
-    // Логируем в консоль
-    console.log(`Новое сообщение обратной связи от ${email || 'аноним'}: ${message}`);
-    
-    // Отправляем сообщение в Telegram администратору
-    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-      try {
-        const adminMessage = `
+        const { message, email } = req.body;
+        if (!message || message.trim().length < 5) {
+            return res.status(400).json({ error: 'Сообщение должно содержать минимум 5 символов' });
+        }
+        let feedbackList = [];
+        try {
+            const data = await fs.readFile(FEEDBACK_FILE, 'utf8');
+            feedbackList = JSON.parse(data);
+        } catch (e) {
+            // Игнорируем ошибку - файла не существует
+        }
+        const newFeedback = {
+            id: Date.now().toString(),
+            message: message.trim(),
+            email: email ? email.trim() : null,
+            date: new Date().toISOString()
+        };
+        feedbackList.push(newFeedback);
+        await fs.writeFile(FEEDBACK_FILE, JSON.stringify(feedbackList, null, 2), 'utf8');
+        // Логируем в консоль
+        console.log(`Новое сообщение обратной связи от ${email || 'аноним'}: ${message}`);
+        // Отправляем сообщение в Telegram администратору
+        if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+            try {
+                const adminMessage = `
 📨 *Новое сообщение обратной связи*
-
 📧 *Email:* ${email ? email : 'не указан'}
 👤 *IP адрес:* ${req.ip}
 ⏰ *Время:* ${new Date().toLocaleString('ru-RU')}
-
 💬 *Сообщение:*
 ${message}
-        `.trim();
-        
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN, 
-          process.env.TELEGRAM_CHAT_ID, 
-          adminMessage,
-          'Markdown'
-        );
-      } catch (telegramError) {
-        console.error('❌ Ошибка отправки сообщения в Telegram:', telegramError);
-      }
-    } else {
-      console.warn('⚠️ Переменные окружения для Telegram не установлены. Сообщение не отправлено.');
+`.trim();
+                await sendTelegramMessage(
+                    process.env.TELEGRAM_BOT_TOKEN,
+                    process.env.TELEGRAM_CHAT_ID,
+                    adminMessage,
+                    'Markdown'
+                );
+            } catch (telegramError) {
+                console.error('❌ Ошибка отправки сообщения в Telegram:', telegramError);
+            }
+        } else {
+            console.warn('⚠️ Переменные окружения для Telegram не установлены. Сообщение не отправлено.');
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Ошибка сохранения обратной связи:', err);
+        res.status(500).json({ error: 'Ошибка при сохранении сообщения' });
     }
-    
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Ошибка сохранения обратной связи:', err);
-    res.status(500).json({ error: 'Ошибка при сохранении сообщения' });
-  }
 });
+
 // === API: Вход партнера ===
 app.post('/api/partner/login', async (req, res) => {
     try {
@@ -556,8 +900,8 @@ app.post('/api/partner/login', async (req, res) => {
         }
         const data = await fs.readFile(PARTNERS_FILE, 'utf8');
         const partners = JSON.parse(data);
-        const partner = partners.find(p => 
-            p.username === username && p.password === hashPassword(password)
+        const partner = partners.find(p =>
+            p.username === username && verifyPassword(password, p.password)
         );
         if (partner) {
             // Возвращаем данные партнера без пароля
@@ -571,6 +915,7 @@ app.post('/api/partner/login', async (req, res) => {
         res.status(500).json({ error: 'Ошибка аутентификации' });
     }
 });
+
 // === API: Получить профиль партнера ===
 app.get('/api/partner/:id/profile', async (req, res) => {
     try {
@@ -592,6 +937,7 @@ app.get('/api/partner/:id/profile', async (req, res) => {
         res.status(500).json({ error: 'Ошибка получения профиля' });
     }
 });
+
 // === API: Сохранить профиль партнера ===
 app.post('/api/partner/:id/profile', async (req, res) => {
     try {
@@ -617,6 +963,7 @@ app.post('/api/partner/:id/profile', async (req, res) => {
         res.status(500).json({ error: 'Ошибка сохранения профиля' });
     }
 });
+
 // === API: Получить заказы партнера ===
 app.get('/api/partner/:id/orders', async (req, res) => {
     try {
@@ -633,6 +980,7 @@ app.get('/api/partner/:id/orders', async (req, res) => {
         res.status(500).json({ error: 'Ошибка получения заказов' });
     }
 });
+
 // === API: Создание заказа ===
 app.post('/api/orders', async (req, res) => {
     try {
@@ -673,45 +1021,38 @@ app.post('/api/orders', async (req, res) => {
         orders.push(newOrder);
         // Сохраняем заказы
         await fs.writeFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
-        
         // Формируем сообщение для Telegram
         const orderDate = new Date().toLocaleString('ru-RU');
         let itemsList = '';
-        
         newOrder.items.forEach((item, index) => {
-            itemsList += `${index + 1}) ${item.name}, ${item.size ? `${item.size} мм` : ''}, ${item.itemNumber || 'без артикула'}, ${item.quantity} шт., ${(item.price * item.quantity).toFixed(2)} ₽\n`;
+            itemsList += `${index + 1}) ${item.name}, ${item.size ? `${item.size} мм` : ''}, ${item.itemNumber || 'без артикула'}, ${item.quantity} шт., ${(item.price * item.quantity).toFixed(2)} ₽
+`;
         });
-        
         const telegramMessage = `
 🆕 НОВЫЙ ЗАКАЗ #${orderId}
-
 👤 Данные пользователя:
-   Имя: ${newOrder.customerName}
-   Телефон: ${newOrder.phone}
-   ${newOrder.email ? `Email: ${newOrder.email}\n` : ''}
-   ${newOrder.isPartner ? 'Тип: Партнер' : `Адрес: ${newOrder.address}`}
-
+Имя: ${newOrder.customerName}
+Телефон: ${newOrder.phone}
+${newOrder.email ? `Email: ${newOrder.email}
+` : ''}
+${newOrder.isPartner ? 'Тип: Партнер' : `Адрес: ${newOrder.address}`}
 📅 Дата заказа: ${orderDate}
-
 📦 Товары в заказе:
 ${itemsList}
 💰 Итого: ${newOrder.total.toFixed(2)} ₽
-
 💬 Комментарий: ${newOrder.comments || 'Не указан'}
-        `.trim();
-
+`.trim();
         console.log(`📥 Новый заказ: ${orderId}`);
         console.log(`👤 Клиент: ${orderData.customerName}`);
         console.log(`📞 Телефон: ${orderData.phone}`);
         console.log(`💰 Сумма: ${orderData.total.toFixed(2)} ₽`);
         console.log(`📦 Товаров: ${orderData.items.length}`);
-        
         // Отправляем уведомление в Telegram
         if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
             try {
                 await sendTelegramMessage(
-                    process.env.TELEGRAM_BOT_TOKEN, 
-                    process.env.TELEGRAM_CHAT_ID, 
+                    process.env.TELEGRAM_BOT_TOKEN,
+                    process.env.TELEGRAM_CHAT_ID,
                     telegramMessage,
                     'Markdown'
                 );
@@ -722,7 +1063,6 @@ ${itemsList}
         } else {
             console.warn('⚠️ Переменные окружения для Telegram не установлены. Уведомление о заказе не отправлено.');
         }
-
         // Возвращаем успешный ответ
         res.json({ success: true, orderId: orderId });
     } catch (err) {
@@ -730,6 +1070,7 @@ ${itemsList}
         res.status(500).json({ error: 'Ошибка при создании заказа' });
     }
 });
+
 // === API: Получение заказов (для админки) ===
 app.get('/api/orders', async (req, res) => {
     try {
@@ -741,6 +1082,7 @@ app.get('/api/orders', async (req, res) => {
         res.status(500).json({ error: 'Ошибка при получении заказов' });
     }
 });
+
 app.patch('/api/orders/:id/status', async (req, res) => {
     try {
         const orderId = req.params.id;
@@ -863,70 +1205,59 @@ app.patch('/api/orders/:id/status', async (req, res) => {
         res.status(500).json({ error: 'Ошибка обновления статуса заказа и остатков' });
     }
 });
+
 // === API: Изменить номер заказа ===
 app.patch('/api/orders/:id/order-number', async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const { newOrderNumber } = req.body;
-    
-    if (!newOrderNumber || typeof newOrderNumber !== 'string' || newOrderNumber.trim() === '') {
-      return res.status(400).json({ error: 'Новый номер заказа обязателен и должен быть строкой' });
-    }
-    
-    // Загружаем заказы
-    const data = await fs.readFile(ORDERS_FILE, 'utf8');
-    let orders = JSON.parse(data);
-    
-    // Находим заказ
-    const orderIndex = orders.findIndex(order => order.id === orderId);
-    if (orderIndex === -1) {
-      return res.status(404).json({ error: 'Заказ не найден' });
-    }
-    
-    // Сохраняем старый ID для возможного возврата временных данных
-    const oldId = orders[orderIndex].id;
-    
-    // Проверяем, не существует ли уже заказа с таким номером
-    if (orders.some(order => order.id === newOrderNumber.trim() && order.id !== oldId)) {
-      return res.status(400).json({ error: 'Заказ с таким номером уже существует' });
-    }
-    
-    // Обновляем номер заказа
-    const updatedOrder = {
-      ...orders[orderIndex],
-      id: newOrderNumber.trim(),
-      originalId: orders[orderIndex].originalId || oldId // Сохраняем оригинальный ID для отслеживания
-    };
-    
-    // Обновляем заказ в массиве
-    orders[orderIndex] = updatedOrder;
-    
-    // Обновляем временные данные для этого заказа, если они есть
     try {
-      const tempData = await fs.readFile(TEMP_PRODUCTS_FILE, 'utf8');
-      let tempProducts = JSON.parse(tempData);
-      
-      // Обновляем orderId во временных данных
-      tempProducts = tempProducts.map(temp => 
-        temp.orderId === oldId ? { ...temp, orderId: newOrderNumber.trim() } : temp
-      );
-      
-      await fs.writeFile(TEMP_PRODUCTS_FILE, JSON.stringify(tempProducts, null, 2), 'utf8');
-    } catch (e) {
-      console.warn('Не удалось обновить временные данные:', e);
+        const orderId = req.params.id;
+        const { newOrderNumber } = req.body;
+        if (!newOrderNumber || typeof newOrderNumber !== 'string' || newOrderNumber.trim() === '') {
+            return res.status(400).json({ error: 'Новый номер заказа обязателен и должен быть строкой' });
+        }
+        // Загружаем заказы
+        const data = await fs.readFile(ORDERS_FILE, 'utf8');
+        let orders = JSON.parse(data);
+        // Находим заказ
+        const orderIndex = orders.findIndex(order => order.id === orderId);
+        if (orderIndex === -1) {
+            return res.status(404).json({ error: 'Заказ не найден' });
+        }
+        // Сохраняем старый ID для возможного возврата временных данных
+        const oldId = orders[orderIndex].id;
+        // Проверяем, не существует ли уже заказа с таким номером
+        if (orders.some(order => order.id === newOrderNumber.trim() && order.id !== oldId)) {
+            return res.status(400).json({ error: 'Заказ с таким номером уже существует' });
+        }
+        // Обновляем номер заказа
+        const updatedOrder = {
+            ...orders[orderIndex],
+            id: newOrderNumber.trim(),
+            originalId: orders[orderIndex].originalId || oldId // Сохраняем оригинальный ID для отслеживания
+        };
+        // Обновляем заказ в массиве
+        orders[orderIndex] = updatedOrder;
+        // Обновляем временные данные для этого заказа, если они есть
+        try {
+            const tempData = await fs.readFile(TEMP_PRODUCTS_FILE, 'utf8');
+            let tempProducts = JSON.parse(tempData);
+            // Обновляем orderId во временных данных
+            tempProducts = tempProducts.map(temp =>
+                temp.orderId === oldId ? { ...temp, orderId: newOrderNumber.trim() } : temp
+            );
+            await fs.writeFile(TEMP_PRODUCTS_FILE, JSON.stringify(tempProducts, null, 2), 'utf8');
+        } catch (e) {
+            console.warn('Не удалось обновить временные данные:', e);
+        }
+        // Сохраняем обновленные заказы
+        await fs.writeFile(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
+        console.log(`Номер заказа изменен: ${oldId} -> ${newOrderNumber.trim()}`);
+        res.json({ success: true, order: updatedOrder });
+    } catch (err) {
+        console.error('Ошибка обновления номера заказа:', err);
+        res.status(500).json({ error: 'Ошибка обновления номера заказа' });
     }
-    
-    // Сохраняем обновленные заказы
-    await fs.writeFile(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
-    
-    console.log(`Номер заказа изменен: ${oldId} -> ${newOrderNumber.trim()}`);
-    res.json({ success: true, order: updatedOrder });
-    
-  } catch (err) {
-    console.error('Ошибка обновления номера заказа:', err);
-    res.status(500).json({ error: 'Ошибка обновления номера заказа' });
-  }
 });
+
 // === API: Получить временные данные (товары "в обработке") ===
 app.get('/api/temp-products', async (req, res) => {
     try {
@@ -943,6 +1274,7 @@ app.get('/api/temp-products', async (req, res) => {
         res.status(500).json({ error: 'Ошибка получения временных данных' });
     }
 });
+
 // === API: Обновить временные данные при оформлении заказа ===
 app.post('/api/update-temp-products', async (req, res) => {
     try {
@@ -977,6 +1309,7 @@ app.post('/api/update-temp-products', async (req, res) => {
         res.status(500).json({ error: 'Ошибка обновления временных данных' });
     }
 });
+
 // === API: Удалить заказ ===
 app.delete('/api/orders/:id', async (req, res) => {
     try {
@@ -1030,80 +1363,87 @@ app.delete('/api/orders/:id', async (req, res) => {
         res.status(500).json({ error: 'Ошибка при удалении заказа' });
     }
 });
-// === Админка ===
-app.get('/admin/login', (req, res) => {
-    const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Вход в админку</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background: #f5f5f5; }
-                .login-box {
-                    display: inline-block;
-                    padding: 30px;
-                    border: 1px solid #ddd;
-                    border-radius: 10px;
-                    background: white;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                }
-                input { padding: 10px; margin: 10px 0; width: 250px; border: 1px solid #ddd; border-radius: 4px; }
-                button { padding: 10px 25px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-                button:hover { background: #218838; }
-                code { background: #f8f9fa; padding: 2px 5px; border-radius: 3px; border: 1px solid #e9ecef; }
-            </style>
-        </head>
-        <body>
-            <div class="login-box">
-                <h2>🚪 Админка ДВЕРИ МАСТАК</h2>
-                <form id="loginForm">
-                    <div>
-                        <label>Токен доступа:</label><br>
-                        <input type="password" id="token" required autofocus>
-                    </div>
-                    <button type="submit">Войти</button>
-                </form>
-                <!-- <p style="color: #6c757d; margin-top: 20px; font-size: 14px;">
-                    Токен: <code>${ADMIN_TOKEN}</code>
-                </p> -->
-            </div>
-            <script>
-                document.getElementById('loginForm').addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const token = document.getElementById('token').value;
-                    window.location.href = '/admin/auth?token=' + encodeURIComponent(token);
-                });
-            </script>
-        </body>
-        </html>
-    `);
-});
-app.get('/admin/auth', (req, res) => {
-    const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
-    const { token } = req.query;
-    if (token === ADMIN_TOKEN) {
-        return res.send(`
-            <script>
-                localStorage.setItem('isAdminAuthenticated', 'true');
-                window.location.href = '/admin';
-            </script>
-        `);
+
+// Эндпоинт для запроса кода входа
+app.post('/admin/request-login-code', async (req, res) => {
+    try {
+        const { username } = req.body;
+        // Проверяем имя пользователя
+        const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+        if (username !== ADMIN_USERNAME) {
+            return res.status(404).json({ error: 'Пользователь не найден' });
+        }
+        // Генерируем код
+        const code = generateLoginCode();
+        const timestamp = Date.now();
+        // Сохраняем код (действителен 5 минут)
+        loginCodes.set(code, { username, timestamp, expiresAt: timestamp + 300000 });
+        // Отправляем код в Telegram
+        if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
+            const message = `🔐 Код для входа в админку: *${code}*
+Действителен 5 минут.
+Запрошен доступ с IP: ${req.ip}`;
+            await sendTelegramMessage(
+                process.env.TELEGRAM_BOT_TOKEN,
+                process.env.TELEGRAM_ADMIN_CHAT_ID,
+                message,
+                'Markdown'
+            );
+            console.log(`✅ Код входа отправлен в Telegram для пользователя ${username}`);
+            res.json({ success: true, message: 'Код отправлен в Telegram' });
+        } else {
+            console.warn('⚠️ Переменные окружения для Telegram не установлены');
+            loginCodes.delete(code); // Удаляем код, так как не можем отправить
+            res.status(500).json({
+                error: 'Сервис аутентификации недоступен. Обратитесь к администратору.'
+            });
+        }
+    } catch (error) {
+        console.error('❌ Ошибка запроса кода входа:', error);
+        res.status(500).json({ error: 'Ошибка сервера при генерации кода' });
     }
-    res.status(401).send(`
-        <h2>🚫 Доступ запрещен</h2>
-        <p>Неверный токен доступа</p>
-        <a href="/admin/login">Войти снова</a>
-    `);
 });
+
+// Эндпоинт для проверки кода входа
+app.post('/admin/verify-login-code', (req, res) => {
+    const { username, code } = req.body;
+    const loginData = loginCodes.get(code);
+    if (!loginData || loginData.username !== username) {
+        return res.status(400).json({ error: 'Неверный код доступа' });
+    }
+    // Проверяем, не просрочен ли код
+    if (Date.now() > loginData.expiresAt) {
+        loginCodes.delete(code);
+        return res.status(400).json({ error: 'Код просрочен. Запросите новый.' });
+    }
+    // Успешная аутентификация
+    req.session.isAdminAuthenticated = true;
+    req.session.adminUser = loginData.username;
+    // Удаляем использованный код
+    loginCodes.delete(code);
+    console.log(`✅ Пользователь ${username} успешно вошел в систему`);
+    res.json({ success: true });
+});
+
+// Автоматическая очистка просроченных кодов
+function cleanupExpiredCodes() {
+    const now = Date.now();
+    loginCodes.forEach((value, key) => {
+        if (now > value.expiresAt) {
+            loginCodes.delete(key);
+        }
+    });
+    setTimeout(cleanupExpiredCodes, 60000); // Проверяем каждую минуту
+}
+
 // Эндпоинт для запуска update-products.js
 app.get('/api/update-products', (req, res) => {
     const scriptPath = path.join(__dirname, 'update-products.js');
     exec(`node "${scriptPath}"`, (error, stdout, stderr) => {
         if (error) {
             console.error(`Ошибка выполнения update-products.js: ${error.message}`);
-            return res.status(500).json({ 
-                success: false, 
+            return res.status(500).json({
+                success: false,
                 message: `Ошибка при выполнении update-products.js: ${error.message}`
             });
         }
@@ -1111,21 +1451,22 @@ app.get('/api/update-products', (req, res) => {
             console.error(`stderr update-products.js: ${stderr}`);
         }
         console.log(`stdout update-products.js: ${stdout}`);
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: 'Скрипт update-products.js успешно выполнен',
             output: stdout.substring(0, 200) // первые 200 символов вывода
         });
     });
 });
+
 // Эндпоинт для запуска sync-products.js
 app.get('/api/sync-products', (req, res) => {
     const scriptPath = path.join(__dirname, 'sync-products.js');
     exec(`node "${scriptPath}"`, (error, stdout, stderr) => {
         if (error) {
             console.error(`Ошибка выполнения sync-products.js: ${error.message}`);
-            return res.status(500).json({ 
-                success: false, 
+            return res.status(500).json({
+                success: false,
                 message: `Ошибка при выполнении sync-products.js: ${error.message}`
             });
         }
@@ -1133,24 +1474,37 @@ app.get('/api/sync-products', (req, res) => {
             console.error(`stderr sync-products.js: ${stderr}`);
         }
         console.log(`stdout sync-products.js: ${stdout}`);
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: 'Скрипт sync-products.js успешно выполнен',
             output: stdout.substring(0, 200) // первые 200 символов вывода
         });
     });
 });
-// Защита админки (упрощённая — без localStorage на сервере)
-app.use('/admin', (req, res, next) => {
-    if (['/login', '/auth', '/styles.css', '/script.js'].includes(req.path)) {
-        return next();
-    }
-    // На сервере не проверяем localStorage — это клиентская логика
-    next();
-});
+
+// Редирект на страницу логина для /admin если не аутентифицирован
 app.get('/admin', (req, res) => {
+    if (!req.session.isAdminAuthenticated) {
+        return res.redirect('/admin/login');
+    }
     res.sendFile(path.join(ADMIN_DIR, 'index.html'));
 });
+
+// Страница логина
+app.get('/admin/login', (req, res) => {
+    if (req.session.isAdminAuthenticated) {
+        return res.redirect('/admin');
+    }
+    res.sendFile(path.join(ADMIN_DIR, 'login.html'));
+});
+
+// Выход из системы
+app.post('/admin/logout', (req, res) => {
+    req.session.destroy(() => {
+        res.redirect('/admin/login');
+    });
+});
+
 // Запуск
 const server = app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на http://localhost:${PORT}`);
@@ -1161,7 +1515,10 @@ const server = app.listen(PORT, () => {
     console.log('ℹ️ Для отладки можно проверить файл update_error.log в папке input');
     console.log(`👥 Файл партнеров: ${PARTNERS_FILE}`);
 });
-// 🔑 ДОБАВЬТЕ ЭТО В КОНЕЦ ФАЙЛА (после server.listen)
+
+// Запускаем очистку при старте сервера
+cleanupExpiredCodes();
+
 process.on('SIGTERM', () => {
     server.close(() => process.exit(0));
 });

@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadProducts();
     loadVisibleCategories();
     loadVisibleColumns();
-    setupLoginForm();
     setupCheckUpdate();
     setupLogout();
     setupProductSearch();
@@ -147,11 +146,17 @@ function getFilteredProducts() {
 
 // === Переключение формы ===
 function setupToggleForm() {
-    document.getElementById('toggleFormBtn').addEventListener('click', showAddForm);
+    const toggleFormBtn = document.getElementById('toggleFormBtn');
+    if (toggleFormBtn) {
+        toggleFormBtn.addEventListener('click', showAddForm);
+    }
 }
 
 function setupCancelForm() {
-    document.getElementById('cancelFormBtn').addEventListener('click', hideForm);
+    const cancelFormBtn = document.getElementById('cancelFormBtn');
+    if (cancelFormBtn) {
+        cancelFormBtn.addEventListener('click', hideForm);
+    }
 }
 
 function showAddForm() {
@@ -185,15 +190,26 @@ function setupOverlayClose() {
 
 // === Настройки ===
 function setupSettings() {
-    document.getElementById('openSettingsBtn').addEventListener('click', () => {
-        document.getElementById('settingsModal').classList.remove('hidden');
-        renderVisibleCategories();
-        renderVisibleColumns();
-    });
-    document.querySelector('#settingsModal .close').addEventListener('click', () => {
+    const openSettingsBtn = document.getElementById('openSettingsBtn');
+    if (openSettingsBtn) {
+        openSettingsBtn.addEventListener('click', () => {
+            document.getElementById('settingsModal').classList.remove('hidden');
+            renderVisibleCategories();
+            renderVisibleColumns();
+        });
+    }
+
+    const settingsModalClose = document.querySelector('#settingsModal .close');
+    if (settingsModalClose) {
+        settingsModalClose.addEventListener('click', () => {
         document.getElementById('settingsModal').classList.add('hidden');
-    });
-    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+        });
+    }
+
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', saveSettings);
+    }
 }
 
 async function saveSettings() {
@@ -387,16 +403,23 @@ function removeImage(file, element) {
 
 // === Вспомогательные функции ===
 function setupLogout() {
-    document.getElementById('logoutBtn').addEventListener('click', logout);
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', logout);
+    }
 }
 
 function logout() {
-    localStorage.removeItem('isAdminAuthenticated');
-    window.location.href = '/admin/login';
+  fetch('/admin/logout', { method: 'POST' })
+    .then(() => window.location.href = '/admin/login')
+    .catch(console.error);
 }
 
 function setupCheckUpdate() {
-    document.getElementById('checkUpdateBtn').addEventListener('click', checkUpdate);
+    const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+    if (checkUpdateBtn) {
+        checkUpdateBtn.addEventListener('click', checkUpdate);
+    }
 }
 
 async function loadLastUpdateDate() {
@@ -619,20 +642,26 @@ function getDefaultColumnWidth(colId) {
 
 // === Поиск и пагинация ===
 function setupProductSearch() {
-    document.getElementById('productSearch').addEventListener('input', () => {
-        currentPage = 1;
-        renderProducts();
-    });
+    const productSearch = document.getElementById('productSearch');
+    if (productSearch) {
+        productSearch.addEventListener('input', () => {
+            currentPage = 1;
+            renderProducts();
+        });
+    }
 }
 
 function setupItemsPerPage() {
-    document.getElementById('itemsPerPage').addEventListener('change', () => {
-        const value = document.getElementById('itemsPerPage').value;
-        itemsPerPage = value === 'all' ? Number.MAX_VALUE : parseInt(value);
-        currentPage = 1;
-        localStorage.setItem('itemsPerPage', value);
-        renderProducts();
-    });
+    const itemsPerPageElement = document.getElementById('itemsPerPage');
+    if (itemsPerPageElement) {
+        itemsPerPageElement.addEventListener('change', () => {
+            const value = itemsPerPageElement.value;
+            itemsPerPage = value === 'all' ? Number.MAX_VALUE : parseInt(value);
+            currentPage = 1;
+            localStorage.setItem('itemsPerPage', value);
+            renderProducts();
+        });
+    }
 }
 
 // === Категории ===
@@ -641,10 +670,16 @@ function setupCategoryInputs() {
     const c1 = document.getElementById('formCategoryCustom');
     const s2 = document.getElementById('bulkCategorySelect');
     const c2 = document.getElementById('bulkCategoryCustom');
-    c1.addEventListener('input', () => s1.value = '');
-    s1.addEventListener('change', () => { if (s1.value) c1.value = ''; });
-    c2.addEventListener('input', () => s2.value = '');
-    s2.addEventListener('change', () => { if (s2.value) c2.value = ''; });
+
+    if (s1 && c1) {
+        c1.addEventListener('input', () => s1.value = '');
+        s1.addEventListener('change', () => { if (s1.value) c1.value = ''; });
+    }
+
+    if (s2 && c2) {
+        c2.addEventListener('input', () => s2.value = '');
+        s2.addEventListener('change', () => { if (s2.value) c2.value = ''; });
+    }
 }
 
 // === Редактирование ===
@@ -813,14 +848,17 @@ function resetForm() {
 
 // === Массовое редактирование ===
 function setupBulkEdit() {
-    document.getElementById('bulkEditBtn').addEventListener('click', () => {
+    const bulkEditBtn = document.getElementById('bulkEditBtn');
+    if (bulkEditBtn) {
+        bulkEditBtn.addEventListener('click', () => {
         const checked = document.querySelectorAll('.product-checkbox:checked');
         if (checked.length === 0) {
             alert('Выберите товары для редактирования');
             return;
         }
         document.getElementById('bulkEditModal').classList.remove('hidden');
-    });
+        });
+    }
     document.querySelector('#bulkEditModal .close').addEventListener('click', () => {
         document.getElementById('bulkEditModal').classList.add('hidden');
     });
@@ -938,21 +976,28 @@ function updateSelectedCount() {
 
 // === Изменение ширины колонок ===
 function setupColumnResizeToggle() {
+    const cardHeader = document.querySelector('.products-card .card-header');
+    if (!cardHeader) return;
+
     const toggleContainer = document.createElement('div');
     toggleContainer.className = 'column-resize-toggle';
     toggleContainer.innerHTML = `
-        <label class="switch">
-            <input type="checkbox" id="resizeToggle">
-            <span class="slider round"></span>
-        </label>
-        <span>Настроить ширину колонок</span>
+    <label class="switch">
+    <input type="checkbox" id="resizeToggle">
+    <span class="slider round"></span>
+    </label>
+    <span>Настроить ширину колонок</span>
     `;
-    const cardHeader = document.querySelector('.products-card .card-header');
+
     cardHeader.insertBefore(toggleContainer, cardHeader.firstChild);
-    document.getElementById('resizeToggle').addEventListener('change', function() {
-        isColumnResizeMode = this.checked;
-        if (isColumnResizeMode) enableColumnResizing(); else disableColumnResizing();
-    });
+
+    const resizeToggle = document.getElementById('resizeToggle');
+    if (resizeToggle) {
+        resizeToggle.addEventListener('change', function() {
+            isColumnResizeMode = this.checked;
+            if (isColumnResizeMode) enableColumnResizing(); else disableColumnResizing();
+        });
+    }
 }
 
 function enableColumnResizing() {
@@ -1015,13 +1060,6 @@ function loadColumnWidths() {
         } catch (e) {
             console.error('Ошибка загрузки ширины:', e);
         }
-    }
-}
-
-// === Форма входа (заглушка) ===
-function setupLoginForm() {
-    if (!localStorage.getItem('isAdminAuthenticated')) {
-        localStorage.setItem('isAdminAuthenticated', 'true');
     }
 }
 

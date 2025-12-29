@@ -18,12 +18,14 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
+    "csurf": "^1.2.2",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-session": "^1.18.2",
     "fs-extra": "^11.3.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
-    "node-telegram-bot-api": "^0.67.0",
+    "node-telegram-bot-api": "^0.63.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
   }
 }

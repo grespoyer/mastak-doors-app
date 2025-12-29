@@ -9,12 +9,14 @@
         button { margin-top: 15px; padding: 8px 16px; background: #4CAF50; color: white; border: none; cursor: pointer; }
         button:hover { background: #45a049; }
         .file-info { color: #666; font-size: 0.9em; margin-left: 20px; }
+        .note { color: #4361ee; font-size: 0.9em; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>Выберите файлы для экспорта</h2>
-        <input type="file" id="fileInput" multiple>
+        <input type="file" id="fileInput" webkitdirectory multiple>
+        <div class="note">ℹ️ Для сохранения структуры папок выберите <strong>папку</strong> (не отдельные файлы)</div>
         <div id="fileList"></div>
         <button id="generateBtn">Сгенерировать файл</button>
     </div>
@@ -25,11 +27,14 @@
             fileList.innerHTML = '';
             
             Array.from(e.target.files).forEach((file, index) => {
+                // Используем относительный путь из файловой системы
+                const filePath = file.webkitRelativePath || file.name;
+                
                 const fileDiv = document.createElement('div');
                 fileDiv.innerHTML = `
                     <label>
                         <input type="checkbox" data-index="${index}" checked>
-                        ${file.name}
+                        ${filePath}
                     </label>
                     <div class="file-info">(${formatFileSize(file.size)}, ${file.type || 'неизвестный тип'})</div>
                 `;
@@ -53,10 +58,12 @@
             for (const file of selectedFiles) {
                 try {
                     const content = await readFileContent(file);
-                    outputContent += `${getFakePath(file.name)}:\n${content}\n\n`;
+                    // Используем реальный относительный путь
+                    const filePath = file.webkitRelativePath || file.name;
+                    outputContent += `${filePath}:\n${content}\n\n`;
                 } catch (error) {
                     console.error(`Ошибка чтения файла ${file.name}:`, error);
-                    outputContent += `${getFakePath(file.name)}:\n[Ошибка чтения файла]\n\n`;
+                    outputContent += `${file.webkitRelativePath || file.name}:\n[Ошибка чтения файла]\n\n`;
                 }
             }
 
@@ -94,12 +101,6 @@
             const sizes = ['Bytes', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        function getFakePath(filename) {
-            // Эмуляция пути (браузер не предоставляет реальные пути)
-            const folders = ['public'];
-            return `${folders[Math.floor(Math.random() * folders.length)]}/${filename}`;
         }
     </script>
 </body>

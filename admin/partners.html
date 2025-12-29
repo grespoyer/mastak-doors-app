@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админка ДВЕРИ МАСТАК - Партнеры</title>
+<link rel="stylesheet" href="/admin/styles.css">
+<link rel="stylesheet" href="/admin/partners.css">
+</head>
+<body>
+<div class="container">
+<header>
+<div class="page-title">
+<h1>🚪 Админка: Управление партнерами</h1>
+</div>
+<div class="tabs-container">
+<nav class="tabs">
+<a href="/admin/" class="tab">Товары</a>
+<a href="/admin/orders.html" class="tab">
+Заказы
+<span class="badge new-orders-badge" id="newOrdersBadge" style="display: none;">0</span>
+</a>
+<a href="/admin/partners.html" class="tab active">Партнеры</a>
+</nav>
+</div>
+<div class="header-actions">
+<button class="btn btn-primary" id="addPartnerBtn">➕ Добавить партнера</button>
+<button class="btn btn-primary settings-btn" id="openSettingsBtn">⚙️ Настройки</button>
+<button class="btn" onclick="logout()">🚪 Выйти</button>
+</div>
+</header>
+<div class="dashboard">
+<div class="card partners-card">
+<div class="card-header">
+<h2 class="card-title">📋 Список партнеров</h2>
+<div class="search-actions">
+<input type="text" id="partnerSearch" placeholder="Поиск по партнерам..." class="search-input">
+</div>
+</div>
+<div class="table-container">
+<table class="partner-table">
+<thead>
+<tr>
+<th>ID</th>
+<th>Название</th>
+<th>Логин</th>
+<th>Контактное лицо</th>
+<th>Email</th>
+<th>Телефон</th>
+<th>Дата создания</th>
+<th>Действия</th>
+</tr>
+</thead>
+<tbody id="partnersTableBody">
+<!-- Партнеры будут загружены динамически -->
+</tbody>
+</table>
+</div>
+<div id="noPartnersMessage" style="text-align: center; padding: 30px; color: var(--gray);">
+<p>Нет добавленных партнеров</p>
+</div>
+</div>
+</div>
+<!-- Модальное окно для добавления/редактирования партнера -->
+<div id="partnerModal" class="modal hidden">
+<div class="modal-content">
+<span class="close">&times;</span>
+<h2 id="modalTitle">➕ Добавить нового партнера</h2>
+<form id="partnerForm">
+<input type="hidden" id="partnerId">
+<div class="form-group">
+<label for="partnerName">Название организации:</label>
+<input type="text" id="partnerName" required placeholder="ООО Двери">
+</div>
+<div class="form-group">
+<label for="partnerUsername">Логин:</label>
+<input type="text" id="partnerUsername" required placeholder="partner123">
+</div>
+<div class="form-group">
+<label for="partnerPassword">Пароль:</label>
+<input type="password" id="partnerPassword" required placeholder="минимум 6 символов">
+</div>
+<div class="form-group">
+<label for="partnerContactPerson">Контактное лицо:</label>
+<input type="text" id="partnerContactPerson" placeholder="Иван Иванов">
+</div>
+<div class="form-group">
+<label for="partnerEmail">Email:</label>
+<input type="email" id="partnerEmail" placeholder="partner@example.com">
+</div>
+<div class="form-group">
+<label for="partnerPhone">Телефон:</label>
+<input type="tel" id="partnerPhone" placeholder="+7 (999) 123-45-67">
+</div>
+<button type="submit" class="btn btn-primary" id="savePartnerBtn">💾 Сохранить партнера</button>
+</form>
+</div>
+</div>
+<!-- Модальное окно подтверждения удаления -->
+<div id="deletePartnerModal" class="modal hidden">
+<div class="modal-content">
+<span class="close">&times;</span>
+<h2>Подтверждение удаления</h2>
+<p id="deletePartnerText">Вы уверены, что хотите удалить этого партнера? Все его заказы останутся в системе, но будут доступны только администратору.</p>
+<div style="display: flex; gap: 10px; margin-top: 20px;">
+<button class="btn btn-danger" id="confirmDeletePartnerBtn">Да, удалить</button>
+<button class="btn btn-outline" id="cancelDeletePartnerBtn">Отмена</button>
+</div>
+</div>
+</div>
+<!-- Модальное окно уведомления -->
+<div id="notificationModal" class="modal hidden">
+<div class="modal-content">
+<span class="close">&times;</span>
+<h2 id="notificationTitle">Уведомление</h2>
+<p id="notificationText"></p>
+<button class="btn btn-primary" id="closeNotificationBtn">OK</button>
+</div>
+</div>
+</div>
+<script src="/admin/partners.js"></script>
+</body>
+</html>

@@ -20565,7 +20565,7 @@
       "/uploads/ermitazh-4_vinil_beliy_steklo_matelyuks_s_almaznoy_gravirovkoy_kvadro.jpg"
     ],
     "createdAt": "2025-12-25T14:10:06.303Z",
-    "item": "000000",
+    "item": "33783",
     "stockProgram": 1,
     "expectedDeliveryDate": null
   },
@@ -20582,7 +20582,7 @@
       "/uploads/ermitazh-4_vinil_beliy_steklo_matelyuks_s_almaznoy_gravirovkoy_kvadro.jpg"
     ],
     "createdAt": "2025-12-25T14:10:06.303Z",
-    "item": "000000",
+    "item": "33784",
     "stockProgram": 1,
     "expectedDeliveryDate": null
   },
@@ -20599,7 +20599,7 @@
       "/uploads/ermitazh-4_vinil_beliy_steklo_matelyuks_s_almaznoy_gravirovkoy_kvadro.jpg"
     ],
     "createdAt": "2025-12-25T14:10:06.303Z",
-    "item": "000000",
+    "item": "33785",
     "stockProgram": 1,
     "expectedDeliveryDate": null
   },
@@ -20616,7 +20616,7 @@
       "/uploads/ermitazh-4_vinil_beliy_steklo_matelyuks_s_almaznoy_gravirovkoy_kvadro.jpg"
     ],
     "createdAt": "2025-12-25T14:10:06.303Z",
-    "item": "000000",
+    "item": "33786",
     "stockProgram": 1,
     "expectedDeliveryDate": "30.12.2025"
   },
@@ -30408,6 +30408,51 @@
       "/uploads/КАРОЛИНА_softTouch_графит_стекло_мателюкс.jpg"
     ],
     "createdAt": "2025-12-25T14:10:06.419Z",
+    "item": "000000",
+    "stockProgram": 0,
+    "expectedDeliveryDate": "30.12.2025"
+  },
+  {
+    "id": "1766652659622zq4xq",
+    "name": "(НЕСТАНДАРТ) ГЕОМЕТРИЯ-1 эмаль белая глухое защелка магнит",
+    "price": 0,
+    "category": "Межкомнатные двери",
+    "color": "Эмаль белая",
+    "glass": "Глухое",
+    "size": "800х1950",
+    "stock": 0,
+    "images": [],
+    "createdAt": "2025-12-29T16:08:22.392Z",
+    "item": "000000",
+    "stockProgram": 0,
+    "expectedDeliveryDate": "30.12.2025"
+  },
+  {
+    "id": "176665265962431tn0",
+    "name": "(НЕСТАНДАРТ) ГЕОМЕТРИЯ-3 эмаль серая глухое без врезки",
+    "price": 0,
+    "category": "Межкомнатные двери",
+    "color": "Эмаль серая",
+    "glass": "Глухое",
+    "size": "900х2050",
+    "stock": 0,
+    "images": [],
+    "createdAt": "2025-12-29T16:08:22.393Z",
+    "item": "000000",
+    "stockProgram": 0,
+    "expectedDeliveryDate": "30.12.2025"
+  },
+  {
+    "id": "1766652659628d5x0o",
+    "name": "Доборный элемент 100 простой лиственница латте",
+    "price": 0,
+    "category": "Погонаж простой",
+    "color": "Лиственница латте",
+    "glass": "",
+    "size": "10х100х2070",
+    "stock": 0,
+    "images": [],
+    "createdAt": "2025-12-29T16:08:22.393Z",
     "item": "000000",
     "stockProgram": 0,
     "expectedDeliveryDate": "30.12.2025"

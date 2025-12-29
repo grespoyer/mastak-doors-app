@@ -2,15 +2,21 @@
   {
     "id": "1",
     "username": "partner1",
-    "password": "0b14d501a594442a01c6859541bcb3e8164d183d32937b851835442f69d5c94e",
+    "password": "$2b$12$7t7P7A1lIYwbFla/I7JrNecE0vEESq787v/4UdMXvphuxw/AXWWl2",
     "name": "Партнер №1",
-    "createdAt": "2025-12-08T19:42:46.514Z",
-    "companyName": "222",
     "contactPerson": "ИП Такой Т.О.",
-    "phone": "11",
-    "email": "111@111.ru",
-    "address": "dsfadsf",
-    "inn": "",
-    "bankDetails": ""
+    "email": "partner1@example.com",
+    "phone": "+7 (999) 123-45-67",
+    "createdAt": "2025-12-29T06:30:28.676Z"
+  },
+  {
+    "id": "1767019650705",
+    "username": "sovkov@yandex.ru",
+    "password": "$2b$12$8f8DggiEDOKdC5Y2nsWs1.8nSdRG49231fl44cbu/TPc6h8gabeDi",
+    "name": "ИП Совков А.В.",
+    "contactPerson": "Александр Валентинович",
+    "email": "sovkov@yandex.ru",
+    "phone": "8(990)456-45-69",
+    "createdAt": "2025-12-29T14:47:30.705Z"
   }
 ]

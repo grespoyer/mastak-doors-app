@@ -1,131 +1,136 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Админка ДВЕРИ МАСТАК - Заказы</title>
-    <link rel="stylesheet" href="/admin/styles.css">
-    <link rel="stylesheet" href="/admin/orders.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админка ДВЕРИ МАСТАК - Заказы</title>
+<link rel="stylesheet" href="/admin/styles.css">
+<link rel="stylesheet" href="/admin/orders.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🚪 Админка: Управление заказами</h1>
-            <div class="header-actions">
-                <nav class="tabs">
-                    <a href="/admin/" class="tab">Товары</a>
-                    <a href="/admin/orders.html" class="tab active">
-                        Заказы
-                        <span class="badge new-orders-badge" id="newOrdersBadge" style="display: none;">0</span>
-                    </a>
-                </nav>
-                <button class="btn btn-danger" id="deleteSelectedOrdersBtn" style="display: none;">🗑️ Удалить выбранные</button>
-                <button class="btn btn-primary settings-btn" id="openSettingsBtn">⚙️ Настройки</button>
-                <a href="#" class="logout" id="logoutBtn">🚪 Выйти</a>
-            </div>
-        </header>
-        <div class="dashboard">
-            <div class="card orders-card">
-                <div class="card-header">
-                    <h2 class="card-title">📋 Список заказов</h2>
-                    <div class="search-actions">
-                        <input type="text" id="orderSearch" placeholder="Поиск по заказам..." class="search-input">
-                        <select id="statusFilter" class="search-input">
-                            <option value="all">Все статусы</option>
-                            <option value="new">Новые</option>
-                            <option value="processing">В обработке</option>
-                            <option value="completed">Завершенные</option>
-                            <option value="cancelled">Отмененные</option>
-                        </select>
-                        <select id="customerFilter" class="search-input">
-                            <option value="all">Все клиенты</option>
-                            <!-- Клиенты будут добавлены динамически -->
-                        </select>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table class="order-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 40px; text-align: center;">
-                                    <input type="checkbox" id="selectAllOrders">
-                                </th>
-                                <th>ID</th>
-                                <th>Дата</th>
-                                <th>Клиент</th>
-                                <th>Контакты</th>
-                                <th>Статус</th>
-                                <th>Сумма</th>
-                                <th>Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ordersTableBody">
-                            <!-- Заказы будут загружены динамически -->
-                        </tbody>
-                    </table>
-                </div>
-                <div class="pagination-controls" id="paginationControls">
-                    <div class="pagination-info" id="paginationInfo">Показано 0 из 0 заказов</div>
-                    <div class="pagination-buttons">
-                        <button class="btn btn-outline" id="prevPageBtn" disabled>← Назад</button>
-                        <div id="pageNumbers"></div>
-                        <button class="btn btn-outline" id="nextPageBtn">Вперед →</button>
-                    </div>
-                </div>
-                <div id="noOrdersMessage" style="text-align: center; padding: 30px; color: var(--gray);">
-                    <p>Нет заказов</p>
-                </div>
-            </div>
-        </div>
-        <!-- Модальное окно деталей заказа -->
-        <div id="orderDetailsModal" class="modal hidden">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <div class="form-group order-edit-section">
-                <label>Номер заказа:</label>
-                <div class="order-edit-field">
-                    <input type="text" id="editOrderNumber" class="edit-field">
-                    <button class="btn btn-sm btn-primary save-btn" id="saveOrderNumberBtn">💾 Сохранить</button>
-                </div>
-                </div>                
-                <h2>Детали заказа #<span id="orderId"></span></h2>
-                <div id="orderDetailsContent"></div>
-                <button class="btn btn-danger delete-order-btn" id="deleteOrderBtn">🗑️ Удалить заказ</button>
-                <button class="btn btn-primary" id="closeOrderDetails">Закрыть</button>
-            </div>
-        </div>
-        <!-- Модальное окно подтверждения удаления -->
-        <div id="deleteConfirmationModal" class="modal hidden">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>Подтверждение удаления</h2>
-                <p id="deleteConfirmationText">Вы уверены, что хотите удалить этот заказ?</p>
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button class="btn btn-danger" id="confirmDeleteBtn">Да, удалить</button>
-                    <button class="btn btn-outline" id="cancelDeleteBtn">Отмена</button>
-                </div>
-            </div>
-        </div>
-        <!-- Модальное окно настроек -->
-        <div id="settingsModal" class="modal hidden">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>⚙️ Настройки системы</h2>
-                <div class="settings-section">
-                    <h3>Показывать заказов на странице:</h3>
-                    <div class="form-group">
-                        <select id="itemsPerPage" class="search-input">
-                            <option value="5">5</option>
-                            <option value="10" selected>10</option>
-                            <option value="25">25</option>
-                            <option value="50">50</option>
-                        </select>
-                    </div>
-                </div>
-                <button class="btn btn-primary" id="saveSettingsBtn">💾 Сохранить настройки</button>
-            </div>
-        </div>
-    </div>
-    <script src="/admin/orders.js"></script>
+<div class="container">
+<header>
+<div class="page-title">
+<h1>🚪 Админка: Управление заказами</h1>
+</div>
+<div class="tabs-container">
+<nav class="tabs">
+<a href="/admin/" class="tab">Товары</a>
+<a href="/admin/orders.html" class="tab active">
+Заказы
+<span class="badge new-orders-badge" id="newOrdersBadge" style="display: none;">0</span>
+</a>
+<a href="/admin/partners.html" class="tab">Партнеры</a>
+</nav>
+</div>
+<div class="header-actions">
+<button class="btn btn-danger" id="deleteSelectedOrdersBtn" style="display: none;">🗑️ Удалить выбранные</button>
+<button class="btn btn-primary settings-btn" id="openSettingsBtn">⚙️ Настройки</button>
+<a href="#" class="logout" id="logoutBtn">🚪 Выйти</a>
+</div>
+</header>
+<div class="dashboard">
+<div class="card orders-card">
+<div class="card-header">
+<h2 class="card-title">📋 Список заказов</h2>
+<div class="search-actions">
+<input type="text" id="orderSearch" placeholder="Поиск по заказам..." class="search-input">
+<select id="statusFilter" class="search-input">
+<option value="all">Все статусы</option>
+<option value="new">Новые</option>
+<option value="processing">В обработке</option>
+<option value="completed">Завершенные</option>
+<option value="cancelled">Отмененные</option>
+</select>
+<select id="customerFilter" class="search-input">
+<option value="all">Все клиенты</option>
+<!-- Клиенты будут добавлены динамически -->
+</select>
+</div>
+</div>
+<div class="table-container">
+<table class="order-table">
+<thead>
+<tr>
+<th style="width: 40px; text-align: center;">
+<input type="checkbox" id="selectAllOrders">
+</th>
+<th>ID</th>
+<th>Дата</th>
+<th>Клиент</th>
+<th>Контакты</th>
+<th>Статус</th>
+<th>Сумма</th>
+<th>Действия</th>
+</tr>
+</thead>
+<tbody id="ordersTableBody">
+<!-- Заказы будут загружены динамически -->
+</tbody>
+</table>
+</div>
+<div class="pagination-controls" id="paginationControls">
+<div class="pagination-info" id="paginationInfo">Показано 0 из 0 заказов</div>
+<div class="pagination-buttons">
+<button class="btn btn-outline" id="prevPageBtn" disabled>← Назад</button>
+<div id="pageNumbers"></div>
+<button class="btn btn-outline" id="nextPageBtn">Вперед →</button>
+</div>
+</div>
+<div id="noOrdersMessage" style="text-align: center; padding: 30px; color: var(--gray);">
+<p>Нет заказов</p>
+</div>
+</div>
+</div>
+<!-- Модальное окно деталей заказа -->
+<div id="orderDetailsModal" class="modal hidden">
+<div class="modal-content">
+<span class="close">&times;</span>
+<div class="form-group order-edit-section">
+<label>Номер заказа:</label>
+<div class="order-edit-field">
+<input type="text" id="editOrderNumber" class="edit-field">
+<button class="btn btn-sm btn-primary save-btn" id="saveOrderNumberBtn">💾 Сохранить</button>
+</div>
+</div>
+<h2>Детали заказа #<span id="orderId"></span></h2>
+<div id="orderDetailsContent"></div>
+<button class="btn btn-danger delete-order-btn" id="deleteOrderBtn">🗑️ Удалить заказ</button>
+<button class="btn btn-primary" id="closeOrderDetails">Закрыть</button>
+</div>
+</div>
+<!-- Модальное окно подтверждения удаления -->
+<div id="deleteConfirmationModal" class="modal hidden">
+<div class="modal-content">
+<span class="close">&times;</span>
+<h2>Подтверждение удаления</h2>
+<p id="deleteConfirmationText">Вы уверены, что хотите удалить этот заказ?</p>
+<div style="display: flex; gap: 10px; margin-top: 20px;">
+<button class="btn btn-danger" id="confirmDeleteBtn">Да, удалить</button>
+<button class="btn btn-outline" id="cancelDeleteBtn">Отмена</button>
+</div>
+</div>
+</div>
+<!-- Модальное окно настроек -->
+<div id="settingsModal" class="modal hidden">
+<div class="modal-content">
+<span class="close">&times;</span>
+<h2>⚙️ Настройки системы</h2>
+<div class="settings-section">
+<h3>Показывать заказов на странице:</h3>
+<div class="form-group">
+<select id="itemsPerPage" class="search-input">
+<option value="5">5</option>
+<option value="10" selected>10</option>
+<option value="25">25</option>
+<option value="50">50</option>
+</select>
+</div>
+</div>
+<button class="btn btn-primary" id="saveSettingsBtn">💾 Сохранить настройки</button>
+</div>
+</div>
+</div>
+<script src="/admin/orders.js"></script>
 </body>
 </html>
