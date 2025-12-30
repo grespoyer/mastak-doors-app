@@ -1056,3 +1056,30 @@ footer {
     margin-right: 8px;
     margin-top: 3px;
 }
+/* Стили для крестика в модальном окне детального просмотра */
+#product-detail-modal .modal-content .close {
+    position: sticky;
+    top: 5px;
+    right: 5px;
+    z-index: 1001;
+    background: #dc3545; /* красный фон */
+    color: #ffffff; /* белый крестик */
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    padding: 0;
+    margin-left: auto; /* Выравнивание по правому краю */
+}
+
+/* Важно: контейнер с overflow должен иметь position: relative */
+#product-detail-modal .modal-content {
+    position: relative;
+}

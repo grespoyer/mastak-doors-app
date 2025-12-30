@@ -51,6 +51,7 @@ app.use(session({
     }
 }));
 
+// grespoyer
 // Middleware защиты админки (должно идти ПОСЛЕ настройки сессий, но ДО статических файлов и роутов)
 const requireAdminAuth = (req, res, next) => {
     const publicAdminPaths = [
@@ -74,7 +75,28 @@ const requireAdminAuth = (req, res, next) => {
     
     next();
 };
+// Middleware для аутентификации партнеров
+const requirePartnerAuth = (req, res, next) => {
+  if (!req.session.partner || !req.session.partner.id) {
+    return res.status(401).json({ error: 'Требуется аутентификация партнера' });
+  }
+  next();
+};
 
+// Middleware для проверки прав доступа к данным партнера
+const requirePartnerAccess = (req, res, next) => {
+    if (!req.session.partner || !req.session.partner.id) {
+        return res.status(401).json({ error: 'Требуется аутентификация партнера' });
+    }
+    const requestedPartnerId = req.params.id;
+    const sessionPartnerId = String(req.session.partner.id);
+    
+    // Используем преобразование к строке для сравнения
+    if (sessionPartnerId !== String(requestedPartnerId)) {
+        return res.status(403).json({ error: 'Доступ запрещен: попытка доступа к чужим данным' });
+    }
+    next();
+};
 // Применяем middleware защиты СРАЗУ после настройки сессий
 app.use(requireAdminAuth);
 
@@ -216,6 +238,14 @@ app.get('/api/partners/:id', async (req, res) => {
     console.error('Ошибка получения данных партнера:', err);
     res.status(500).json({ error: 'Ошибка получения данных партнера' });
   }
+});
+// === API: Проверка аутентификации партнера ===
+app.get('/api/partner/check-auth', requirePartnerAuth, async (req, res) => {
+    try {
+        res.json({ authenticated: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Ошибка проверки аутентификации' });
+    }
 });
 // API: Создать нового партнера
 app.post('/api/partners', async (req, res) => {
@@ -893,94 +923,102 @@ ${message}
 
 // === API: Вход партнера ===
 app.post('/api/partner/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        if (!username || !password) {
-            return res.status(400).json({ error: 'Логин и пароль обязательны' });
-        }
-        const data = await fs.readFile(PARTNERS_FILE, 'utf8');
-        const partners = JSON.parse(data);
-        const partner = partners.find(p =>
-            p.username === username && verifyPassword(password, p.password)
-        );
-        if (partner) {
-            // Возвращаем данные партнера без пароля
-            const { password: _, ...partnerData } = partner;
-            res.json(partnerData);
-        } else {
-            res.status(401).json({ error: 'Неверный логин или пароль' });
-        }
-    } catch (err) {
-        console.error('Ошибка при входе партнера:', err);
-        res.status(500).json({ error: 'Ошибка аутентификации' });
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Логин и пароль обязательны' });
     }
+    const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+    const partners = JSON.parse(data);
+    const partner = partners.find(p =>
+      p.username === username && verifyPassword(password, p.password)
+    );
+    if (partner) {
+      // Устанавливаем сессию партнера
+      req.session.partner = { id: partner.id };
+      
+      // Возвращаем данные партнера без пароля
+      const { password: _, ...partnerData } = partner;
+      res.json(partnerData);
+    } else {
+      res.status(401).json({ error: 'Неверный логин или пароль' });
+    }
+  } catch (err) {
+    console.error('Ошибка при входе партнера:', err);
+    res.status(500).json({ error: 'Ошибка аутентификации' });
+  }
 });
 
 // === API: Получить профиль партнера ===
-app.get('/api/partner/:id/profile', async (req, res) => {
-    try {
-        const partnerId = req.params.id;
-        const data = await fs.readFile(PARTNERS_FILE, 'utf8');
-        const partners = JSON.parse(data);
-        const partner = partners.find(p => p.id === partnerId);
-        if (!partner) {
-            return res.status(404).json({ error: 'Партнер не найден' });
-        }
-        // Возвращаем только профильные данные без пароля
-        res.json({
-            contactPerson: partner.contactPerson || '',
-            email: partner.email || '',
-            phone: partner.phone || ''
-        });
-    } catch (err) {
-        console.error('Ошибка получения профиля партнера:', err);
-        res.status(500).json({ error: 'Ошибка получения профиля' });
+app.get('/api/partner/:id/profile', requirePartnerAccess, async (req, res) => {
+  try {
+    const partnerId = req.params.id;
+    const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+    const partners = JSON.parse(data);
+    const partner = partners.find(p => p.id === partnerId);
+    if (!partner) {
+      return res.status(404).json({ error: 'Партнер не найден' });
     }
+    // Возвращаем только профильные данные без пароля
+    res.json({
+      contactPerson: partner.contactPerson || '',
+      email: partner.email || '',
+      phone: partner.phone || ''
+    });
+  } catch (err) {
+    console.error('Ошибка получения профиля партнера:', err);
+    res.status(500).json({ error: 'Ошибка получения профиля' });
+  }
 });
 
 // === API: Сохранить профиль партнера ===
-app.post('/api/partner/:id/profile', async (req, res) => {
-    try {
-        const partnerId = req.params.id;
-        const profileData = req.body;
-        const data = await fs.readFile(PARTNERS_FILE, 'utf8');
-        let partners = JSON.parse(data);
-        const partnerIndex = partners.findIndex(p => p.id === partnerId);
-        if (partnerIndex === -1) {
-            return res.status(404).json({ error: 'Партнер не найден' });
-        }
-        // Обновляем профильные данные партнера
-        partners[partnerIndex] = {
-            ...partners[partnerIndex],
-            contactPerson: profileData.contactPerson || partners[partnerIndex].contactPerson || '',
-            email: profileData.email || partners[partnerIndex].email || '',
-            phone: profileData.phone || partners[partnerIndex].phone || ''
-        };
-        await fs.writeFile(PARTNERS_FILE, JSON.stringify(partners, null, 2));
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Ошибка сохранения профиля партнера:', err);
-        res.status(500).json({ error: 'Ошибка сохранения профиля' });
+app.post('/api/partner/:id/profile', requirePartnerAccess, async (req, res) => {
+  try {
+    const partnerId = req.params.id;
+    const profileData = req.body;
+    const data = await fs.readFile(PARTNERS_FILE, 'utf8');
+    let partners = JSON.parse(data);
+    const partnerIndex = partners.findIndex(p => p.id === partnerId);
+    if (partnerIndex === -1) {
+      return res.status(404).json({ error: 'Партнер не найден' });
     }
+    // Обновляем профильные данные партнера
+    partners[partnerIndex] = {
+      ...partners[partnerIndex],
+      contactPerson: profileData.contactPerson || partners[partnerIndex].contactPerson || '',
+      email: profileData.email || partners[partnerIndex].email || '',
+      phone: profileData.phone || partners[partnerIndex].phone || ''
+    };
+    await fs.writeFile(PARTNERS_FILE, JSON.stringify(partners, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Ошибка сохранения профиля партнера:', err);
+    res.status(500).json({ error: 'Ошибка сохранения профиля' });
+  }
 });
 
 // === API: Получить заказы партнера ===
-app.get('/api/partner/:id/orders', async (req, res) => {
-    try {
-        const partnerId = req.params.id;
-        const data = await fs.readFile(ORDERS_FILE, 'utf8');
-        let orders = JSON.parse(data);
-        // Фильтруем заказы по партнеру
-        const partnerOrders = orders.filter(order => order.partnerId === partnerId);
-        // Сортируем заказы по дате (новые первыми)
-        partnerOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        res.json(partnerOrders);
-    } catch (err) {
-        console.error('Ошибка получения заказов партнера:', err);
-        res.status(500).json({ error: 'Ошибка получения заказов' });
-    }
+app.get('/api/partner/:id/orders', requirePartnerAccess, async (req, res) => {
+  try {
+    const partnerId = req.params.id;
+    const data = await fs.readFile(ORDERS_FILE, 'utf8');
+    let orders = JSON.parse(data);
+    // Фильтруем заказы по партнеру
+    const partnerOrders = orders.filter(order => order.partnerId === partnerId);
+    // Сортируем заказы по дате (новые первыми)
+    partnerOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(partnerOrders);
+  } catch (err) {
+    console.error('Ошибка получения заказов партнера:', err);
+    res.status(500).json({ error: 'Ошибка получения заказов' });
+  }
 });
-
+app.post('/api/partner/logout', (req, res) => {
+  if (req.session.partner) {
+    delete req.session.partner;
+  }
+  res.json({ success: true });
+});
 // === API: Создание заказа ===
 app.post('/api/orders', async (req, res) => {
     try {

@@ -63,34 +63,34 @@ const checkoutBtn = document.getElementById('checkout-btn');
 // Инициализация состояния
 initUserStorage();
 // Инициализация пользовательского хранилища
-function initUserStorage() {
-  // Пытаемся получить данные партнера из localStorage
-  const storedPartner = localStorage.getItem('partner');
-  if (storedPartner) {
-    try {
-      partner = JSON.parse(storedPartner);
-      // Загружаем данные партнера используя его ID
-      favorites = loadUserData(`partner_${partner.id}_favorites`, []);
-      cart = loadUserData(`partner_${partner.id}_cart`, []);
-      customerData = loadUserData(`partner_${partner.id}_customerData`, {});
-      return;
-    } catch (e) {
-      console.error('Ошибка при загрузке данных партнера:', e);
-      // Если есть ошибка при загрузке партнера, очищаем данные
-      localStorage.removeItem('partner');
+async function initUserStorage() {
+    // Пытаемся получить данные партнера из localStorage
+    const storedPartner = localStorage.getItem('partner');
+    if (storedPartner) {
+        try {
+            partner = JSON.parse(storedPartner);
+            // Проверяем аутентификацию на сервере
+            const response = await fetch('/api/partner/check-auth');
+            if (!response.ok) {
+                localStorage.removeItem('partner');
+                partner = null;
+            }
+        } catch (e) {
+            console.error('Ошибка при загрузке данных партнера:', e);
+            localStorage.removeItem('partner');
+        }
     }
-  }
   
-  // Для анонимного пользователя создаем уникальный ID сессии
-  let sessionId = localStorage.getItem('sessionId');
-  if (!sessionId) {
-    sessionId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('sessionId', sessionId);
-  }
-  // Загружаем данные анонимного пользователя
-  favorites = loadUserData(`anon_${sessionId}_favorites`, []);
-  cart = loadUserData(`anon_${sessionId}_cart`, []);
-  customerData = loadUserData(`anon_${sessionId}_customerData`, {});
+    // Для анонимного пользователя создаем уникальный ID сессии
+    let sessionId = localStorage.getItem('sessionId');
+    if (!sessionId) {
+        sessionId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('sessionId', sessionId);
+    }
+    // Загружаем данные анонимного пользователя
+    favorites = loadUserData(`anon_${sessionId}_favorites`, []);
+    cart = loadUserData(`anon_${sessionId}_cart`, []);
+    customerData = loadUserData(`anon_${sessionId}_customerData`, {});
 }
 // Загрузка пользовательских данных с учетом типа пользователя
 function loadUserData(key, defaultValue) {
@@ -456,6 +456,17 @@ function renderProductsTileView(productGroups) {
     document.querySelectorAll('.product-image, .placeholder-image').forEach(element => {
         element.removeEventListener('click', handleProductImageClick);
         element.addEventListener('click', handleProductImageClick);
+    });
+
+    // Добавляем обработчики ошибок для изображений
+    document.querySelectorAll('.product-image').forEach(img => {
+        img.onerror = function() {
+            this.style.display = 'none';
+            const placeholder = this.nextElementSibling;
+            if (placeholder && placeholder.classList.contains('placeholder-image')) {
+                placeholder.style.display = 'flex';
+            }
+        };
     });
     
     // Если есть товары с нулевым остатком и мы еще не показали уведомление, показываем его единожды

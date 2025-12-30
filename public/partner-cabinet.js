@@ -417,24 +417,37 @@ function switchTab(tabName) {
 // grespoyer
 // Показ личного кабинета партнера
 function showPartnerCabinet() {
-  if (!partner) return;
-  partnerCabinetModal.classList.remove('hidden');
-  
-  // Гарантированно активируем вкладку "Мои заказы" при открытии кабинета
-  switchTab('orders');
-  
-  // Загружаем профиль партнера
-  loadPartnerProfile();
-  
-  // Загружаем временные данные и затем заказы
-  // Используем существующую функцию loadTempProducts вместо несуществующей loadTempProductsForProcessingOrders
-  loadTempProducts().then(() => {
-    loadPartnerOrders();
-  }).catch(error => {
-    console.error('Ошибка загрузки временных данных:', error);
-    // Даже при ошибке загружаем заказы
-    loadPartnerOrders();
-  });
+    // Проверяем, залогинен ли партнер
+    if (!partner) {
+        showNotification('Пожалуйста, войдите в систему', 'error', 3000);
+        return;
+    }
+    
+    // Добавьте проверку аутентификации на сервере
+    fetch('/api/partner/check-auth')
+        .then(response => {
+            if (!response.ok) {
+                // Сессия истекла - очищаем данные и просим перелогиниться
+                localStorage.removeItem('partner');
+                partner = null;
+                showNotification('Сессия истекла. Пожалуйста, войдите снова', 'error', 5000);
+                return;
+            }
+            
+            // Если все ок, продолжаем
+            partnerCabinetModal.classList.remove('hidden');
+            switchTab('orders');
+            loadPartnerProfile();
+            loadTempProducts().then(() => {
+                loadPartnerOrders();
+            }).catch(error => {
+                console.error('Ошибка загрузки временных данных:', error);
+                loadPartnerOrders();
+            });
+        })
+        .catch(error => {
+            console.error('Ошибка проверки аутентификации:', error);
+        });
 }
 // Инициализация обработчиков событий для личного кабинета
 function initPartnerCabinetEventListeners() {
