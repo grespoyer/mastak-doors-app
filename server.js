@@ -39,6 +39,9 @@ const TEMP_PRODUCTS_FILE = path.join(__dirname, 'temp.json');
     }
 });
 
+// Позволяем прокси
+app.set('trust proxy', 1);
+
 // Настройка сессий ДО любых роутов
 app.use(session({
     secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
@@ -208,7 +211,11 @@ if (!fse.existsSync(TEMP_PRODUCTS_FILE)) {
 
 // API: Получить список партнеров
 app.get('/api/partners', async (req, res) => {
-  try {
+    if (!req.session.isAdminAuthenticated) {
+        return res.status(401).json({ error: 'Требуется аутентификация' });
+    }
+
+    try {
     const data = await fs.readFile(PARTNERS_FILE, 'utf8');
     const partners = JSON.parse(data);
     // Возвращаем партнеров без паролей
